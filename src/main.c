@@ -14,6 +14,132 @@ STATIC_DATA config = {0};
 ULONG limits_arr[13] = {0};
 ULONG intervals_arr[13] = {0};
 
+static const ULONG region_mask_list[] = {
+	REDUCT_WORKING_SET,
+	REDUCT_SYSTEM_FILE_CACHE,
+	REDUCT_MODIFIED_LIST,
+	REDUCT_STANDBY_LIST,
+	REDUCT_STANDBY_PRIORITY0_LIST,
+	REDUCT_MODIFIED_FILE_CACHE,
+	REDUCT_REGISTRY_CACHE,
+	REDUCT_COMBINE_MEMORY_LISTS,
+};
+
+LPCWSTR _app_get_region_title (
+	_In_ ULONG mask_bit
+)
+{
+	ULONG string_id;
+
+	switch (mask_bit)
+	{
+		case REDUCT_WORKING_SET:
+			string_id = IDS_WORKINGSET_CHK;
+			break;
+
+		case REDUCT_SYSTEM_FILE_CACHE:
+			string_id = IDS_SYSTEMWORKINGSET_CHK;
+			break;
+
+		case REDUCT_MODIFIED_FILE_CACHE:
+			string_id = IDS_MODIFIEDFILECACHE_CHK;
+			break;
+
+		case REDUCT_MODIFIED_LIST:
+			string_id = IDS_MODIFIEDLIST_CHK;
+			break;
+
+		case REDUCT_STANDBY_LIST:
+			string_id = IDS_STANDBYLIST_CHK;
+			break;
+
+		case REDUCT_STANDBY_PRIORITY0_LIST:
+			string_id = IDS_STANDBYLISTPRIORITY0_CHK;
+			break;
+
+		case REDUCT_REGISTRY_CACHE:
+			string_id = IDS_REGISTRYCACHE_CHK;
+			break;
+
+		case REDUCT_COMBINE_MEMORY_LISTS:
+			string_id = IDS_COMBINEMEMORYLISTS_CHK;
+			break;
+
+		default:
+			string_id = IDS_REGION_UNKNOWN;
+			break;
+	}
+
+	return _r_locale_getstring (string_id);
+}
+
+LPCWSTR _app_get_region_title_by_enum (
+	_In_ CLEANUP_REGION_ENUM region
+)
+{
+	static const ULONG region_masks[REGION_COUNT] = {
+		REDUCT_WORKING_SET,
+		REDUCT_SYSTEM_FILE_CACHE,
+		REDUCT_MODIFIED_FILE_CACHE,
+		REDUCT_MODIFIED_LIST,
+		REDUCT_STANDBY_LIST,
+		REDUCT_STANDBY_PRIORITY0_LIST,
+		REDUCT_REGISTRY_CACHE,
+		REDUCT_COMBINE_MEMORY_LISTS,
+	};
+
+	if (region >= REGION_COUNT)
+		return _r_locale_getstring (IDS_REGION_UNKNOWN);
+
+	return _app_get_region_title (region_masks[region]);
+}
+
+LPCWSTR _app_getcleanupreason (
+	_In_ CLEANUP_SOURCE_ENUM src
+)
+{
+	switch (src)
+	{
+		case SOURCE_AUTO:
+			return _r_locale_getstring (IDS_CLEANUP_REASON_AUTO);
+
+		case SOURCE_HOTKEY:
+			return _r_locale_getstring (IDS_CLEANUP_REASON_HOTKEY);
+
+		case SOURCE_CMDLINE:
+			return _r_locale_getstring (IDS_CLEANUP_REASON_CMDLINE);
+
+		default:
+			return _r_locale_getstring (IDS_CLEANUP_REASON_MANUAL);
+	}
+}
+
+VOID _app_apply_default_language ()
+{
+	PR_STRING language;
+
+	language = _r_config_getstring (L"Language", NULL);
+
+	if (language)
+	{
+		if (!_r_str_isempty (&language->sr))
+		{
+			_r_obj_dereference (language);
+
+			return;
+		}
+
+		_r_obj_dereference (language);
+	}
+
+	_r_config_setstring (L"Language", L"Chinese (Simplified)");
+
+	_r_obj_movereference (&app_global.locale.resource_name, _r_obj_createstring (L"Chinese (Simplified)"));
+	_r_obj_movereference (&app_global.locale.current_name, _r_obj_createstring (L"Chinese (Simplified)"));
+
+	_r_locale_initialize ();
+}
+
 INT WINAPIV compare_numbers (
 	_In_opt_ PVOID context,
 	_In_ LPCVOID ptr1,
@@ -591,14 +717,8 @@ INT_PTR CALLBACK SettingsProc (
 
 					_r_listview_addcolumn (hwnd, IDC_REGIONS, 0, NULL, 10, LVCFMT_LEFT);
 
-					_r_listview_additem (hwnd, IDC_REGIONS, 0, TITLE_WORKINGSET, I_DEFAULT, I_DEFAULT, REDUCT_WORKING_SET);
-					_r_listview_additem (hwnd, IDC_REGIONS, 1, TITLE_SYSTEMFILECACHE, I_DEFAULT, I_DEFAULT, REDUCT_SYSTEM_FILE_CACHE);
-					_r_listview_additem (hwnd, IDC_REGIONS, 2, TITLE_MODIFIEDLIST, I_DEFAULT, I_DEFAULT, REDUCT_MODIFIED_LIST);
-					_r_listview_additem (hwnd, IDC_REGIONS, 3, TITLE_STANDBYLIST, I_DEFAULT, I_DEFAULT, REDUCT_STANDBY_LIST);
-					_r_listview_additem (hwnd, IDC_REGIONS, 4, TITLE_STANDBYLISTPRIORITY0, I_DEFAULT, I_DEFAULT, REDUCT_STANDBY_PRIORITY0_LIST);
-					_r_listview_additem (hwnd, IDC_REGIONS, 5, TITLE_MODIFIEDFILECACHE, I_DEFAULT, I_DEFAULT, REDUCT_MODIFIED_FILE_CACHE);
-					_r_listview_additem (hwnd, IDC_REGIONS, 6, TITLE_REGISTRYCACHE, I_DEFAULT, I_DEFAULT, REDUCT_REGISTRY_CACHE);
-					_r_listview_additem (hwnd, IDC_REGIONS, 7, TITLE_COMBINEMEMORYLISTS, I_DEFAULT, I_DEFAULT, REDUCT_COMBINE_MEMORY_LISTS);
+					for (INT i = 0; i < RTL_NUMBER_OF (region_mask_list); i++)
+						_r_listview_additem (hwnd, IDC_REGIONS, i, _app_get_region_title (region_mask_list[i]), I_DEFAULT, I_DEFAULT, region_mask_list[i]);
 
 					_r_listview_setcolumn (hwnd, IDC_REGIONS, 0, NULL, -100);
 
@@ -764,7 +884,7 @@ INT_PTR CALLBACK SettingsProc (
 
 			// localize titles
 			_r_ctrl_setstringformat (hwnd, IDC_TITLE_1, L"%s:", _r_locale_getstring (IDS_TITLE_1));
-			_r_ctrl_setstringformat (hwnd, IDC_TITLE_2, L"%s: (Language)", _r_locale_getstring (IDS_TITLE_2));
+			_r_ctrl_setstringformat (hwnd, IDC_TITLE_2, L"%s %s", _r_locale_getstring (IDS_TITLE_2), _r_locale_getstring (IDS_LANGUAGE_SECTION_HINT));
 			_r_ctrl_setstringformat (hwnd, IDC_TITLE_3, L"%s:", _r_locale_getstring (IDS_TITLE_3));
 			_r_ctrl_setstringformat (hwnd, IDC_TITLE_4, L"%s:", _r_locale_getstring (IDS_TITLE_4));
 			_r_ctrl_setstringformat (hwnd, IDC_TITLE_5, L"%s:", _r_locale_getstring (IDS_TITLE_5));
@@ -795,6 +915,9 @@ INT_PTR CALLBACK SettingsProc (
 					_r_ctrl_setstring (hwnd, IDC_AUTOREDUCTINTERVALENABLE_CHK, _r_locale_getstring (IDS_AUTOREDUCTINTERVALENABLE_CHK));
 
 					_r_ctrl_setstring (hwnd, IDC_HOTKEY_CLEAN_CHK, _r_locale_getstring (IDS_HOTKEY_CLEAN_CHK));
+
+					for (INT i = 0; i < RTL_NUMBER_OF (region_mask_list); i++)
+						_r_listview_setitem (hwnd, IDC_REGIONS, i, 0, _app_get_region_title (region_mask_list[i]), I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 					break;
 				}
@@ -849,8 +972,8 @@ INT_PTR CALLBACK SettingsProc (
 
 				case IDD_SETTINGS_ADVANCED:
 				{
-					_r_ctrl_setstring (hwnd, IDC_ALLOWSTANDBYLISTCLEANUP_CHK, L"Allow \"Standby lists\" and \"Modified page list\" cleanup on autoreduct");
-					_r_ctrl_setstring (hwnd, IDC_LOGRESULTS_CHK, L"Log cleaning results into a debug log");
+					_r_ctrl_setstring (hwnd, IDC_ALLOWSTANDBYLISTCLEANUP_CHK, _r_locale_getstring (IDS_ALLOWSTANDBYLISTCLEANUP_CHK));
+					_r_ctrl_setstring (hwnd, IDC_LOGRESULTS_CHK, _r_locale_getstring (IDS_LOGRESULTS_CHK));
 
 					_app_memory_populate_status_listview (hwnd, IDC_CLEANUP_STATUS);
 
@@ -1656,7 +1779,7 @@ INT_PTR CALLBACK DlgProc (
 				_r_menu_setitemtext (hmenu, IDM_REDUCTCONFIRMATION_CHK, FALSE, _r_locale_getstring (IDS_REDUCTCONFIRMATION_CHK));
 				_r_menu_setitemtext (hmenu, IDM_SKIPUACWARNING_CHK, FALSE, _r_locale_getstring (IDS_SKIPUACWARNING_CHK));
 				_r_menu_setitemtext (hmenu, IDM_CHECKUPDATES_CHK, FALSE, _r_locale_getstring (IDS_CHECKUPDATES_CHK));
-				_r_menu_setitemtextformat (GetSubMenu (hmenu, LANG_SUBMENU), LANG_MENU, TRUE, L"%s (Language)", _r_locale_getstring (IDS_LANGUAGE));
+				_r_menu_setitemtextformat (GetSubMenu (hmenu, LANG_SUBMENU), LANG_MENU, TRUE, _r_locale_getstring (IDS_LANGUAGE_MENU_FORMAT), _r_locale_getstring (IDS_LANGUAGE));
 				_r_menu_setitemtext (hmenu, IDM_WEBSITE, FALSE, _r_locale_getstring (IDS_WEBSITE));
 				_r_menu_setitemtext (hmenu, IDM_CHECKUPDATES, FALSE, _r_locale_getstring (IDS_CHECKUPDATES));
 				_r_menu_setitemtextformat (hmenu, IDM_ABOUT, FALSE, L"%s\tF1", _r_locale_getstring (IDS_ABOUT));
@@ -1756,14 +1879,14 @@ INT_PTR CALLBACK DlgProc (
 					if (!hsubmenu)
 						break;
 
-					_r_menu_additem (hsubmenu, IDM_CLEAN_WORKINGSET, TITLE_WORKINGSET);
-					_r_menu_additem (hsubmenu, IDM_CLEAN_SYSTEMFILECACHE, TITLE_SYSTEMFILECACHE);
-					_r_menu_additem (hsubmenu, IDM_CLEAN_MODIFIEDFILECACHE, TITLE_MODIFIEDFILECACHE);
-					_r_menu_additem (hsubmenu, IDM_CLEAN_MODIFIEDLIST, TITLE_MODIFIEDLIST);
-					_r_menu_additem (hsubmenu, IDM_CLEAN_STANDBYLIST, TITLE_STANDBYLIST);
-					_r_menu_additem (hsubmenu, IDM_CLEAN_STANDBYLISTPRIORITY0, TITLE_STANDBYLISTPRIORITY0);
-					_r_menu_additem (hsubmenu, IDM_CLEAN_REGISTRYCACHE, TITLE_REGISTRYCACHE);
-					_r_menu_additem (hsubmenu, IDM_CLEAN_COMBINEMEMORYLISTS, TITLE_COMBINEMEMORYLISTS);
+					_r_menu_additem (hsubmenu, IDM_CLEAN_WORKINGSET, _app_get_region_title (REDUCT_WORKING_SET));
+					_r_menu_additem (hsubmenu, IDM_CLEAN_SYSTEMFILECACHE, _app_get_region_title (REDUCT_SYSTEM_FILE_CACHE));
+					_r_menu_additem (hsubmenu, IDM_CLEAN_MODIFIEDFILECACHE, _app_get_region_title (REDUCT_MODIFIED_FILE_CACHE));
+					_r_menu_additem (hsubmenu, IDM_CLEAN_MODIFIEDLIST, _app_get_region_title (REDUCT_MODIFIED_LIST));
+					_r_menu_additem (hsubmenu, IDM_CLEAN_STANDBYLIST, _app_get_region_title (REDUCT_STANDBY_LIST));
+					_r_menu_additem (hsubmenu, IDM_CLEAN_STANDBYLISTPRIORITY0, _app_get_region_title (REDUCT_STANDBY_PRIORITY0_LIST));
+					_r_menu_additem (hsubmenu, IDM_CLEAN_REGISTRYCACHE, _app_get_region_title (REDUCT_REGISTRY_CACHE));
+					_r_menu_additem (hsubmenu, IDM_CLEAN_COMBINEMEMORYLISTS, _app_get_region_title (REDUCT_COMBINE_MEMORY_LISTS));
 
 					if (_r_sys_isosversionlower (WINDOWS_8_1))
 						_r_menu_enableitem (hsubmenu, IDM_CLEAN_REGISTRYCACHE, FALSE, FALSE);
@@ -1931,15 +2054,15 @@ INT_PTR CALLBACK DlgProc (
 					{
 						mask = _r_config_getulong (L"ReductMask2", REDUCT_MASK_DEFAULT, NULL);
 
-						_r_menu_setitemtext (hsubmenu_region, IDM_WORKINGSET_CHK, FALSE, TITLE_WORKINGSET);
-						_r_menu_setitemtext (hsubmenu_region, IDM_SYSTEMFILECACHE_CHK, FALSE, TITLE_SYSTEMFILECACHE);
-						_r_menu_setitemtext (hsubmenu_region, IDM_MODIFIEDFILECACHE_CHK, FALSE, TITLE_MODIFIEDFILECACHE);
+						_r_menu_setitemtext (hsubmenu_region, IDM_WORKINGSET_CHK, FALSE, _app_get_region_title (REDUCT_WORKING_SET));
+						_r_menu_setitemtext (hsubmenu_region, IDM_SYSTEMFILECACHE_CHK, FALSE, _app_get_region_title (REDUCT_SYSTEM_FILE_CACHE));
+						_r_menu_setitemtext (hsubmenu_region, IDM_MODIFIEDFILECACHE_CHK, FALSE, _app_get_region_title (REDUCT_MODIFIED_FILE_CACHE));
 
-						_r_menu_setitemtext (hsubmenu_region, IDM_MODIFIEDLIST_CHK, FALSE, TITLE_MODIFIEDLIST);
-						_r_menu_setitemtext (hsubmenu_region, IDM_STANDBYLIST_CHK, FALSE, TITLE_STANDBYLIST);
-						_r_menu_setitemtext (hsubmenu_region, IDM_STANDBYLISTPRIORITY0_CHK, FALSE, TITLE_STANDBYLISTPRIORITY0);
-						_r_menu_setitemtext (hsubmenu_region, IDM_REGISTRYCACHE_CHK, FALSE, TITLE_REGISTRYCACHE);
-						_r_menu_setitemtext (hsubmenu_region, IDM_COMBINEMEMORYLISTS_CHK, FALSE, TITLE_COMBINEMEMORYLISTS);
+						_r_menu_setitemtext (hsubmenu_region, IDM_MODIFIEDLIST_CHK, FALSE, _app_get_region_title (REDUCT_MODIFIED_LIST));
+						_r_menu_setitemtext (hsubmenu_region, IDM_STANDBYLIST_CHK, FALSE, _app_get_region_title (REDUCT_STANDBY_LIST));
+						_r_menu_setitemtext (hsubmenu_region, IDM_STANDBYLISTPRIORITY0_CHK, FALSE, _app_get_region_title (REDUCT_STANDBY_PRIORITY0_LIST));
+						_r_menu_setitemtext (hsubmenu_region, IDM_REGISTRYCACHE_CHK, FALSE, _app_get_region_title (REDUCT_REGISTRY_CACHE));
+						_r_menu_setitemtext (hsubmenu_region, IDM_COMBINEMEMORYLISTS_CHK, FALSE, _app_get_region_title (REDUCT_COMBINE_MEMORY_LISTS));
 
 						_r_menu_checkitem (hsubmenu_region, IDM_WORKINGSET_CHK, 0, MF_BYCOMMAND, (mask & REDUCT_WORKING_SET) == REDUCT_WORKING_SET);
 						_r_menu_checkitem (hsubmenu_region, IDM_SYSTEMFILECACHE_CHK, 0, MF_BYCOMMAND, (mask & REDUCT_SYSTEM_FILE_CACHE) == REDUCT_SYSTEM_FILE_CACHE);
@@ -2000,7 +2123,7 @@ INT_PTR CALLBACK DlgProc (
 							IDX_TRAY_POPUP_2,
 							intervals_arr,
 							RTL_NUMBER_OF (intervals_arr),
-							L"%" TEXT (PR_LONG64) L" min.",
+							_r_locale_getstring (IDS_TRAY_INTERVAL_ITEM),
 							_app_getintervalvalue (),
 							is_enabled
 						);
@@ -2431,9 +2554,8 @@ BOOLEAN NTAPI _app_parseargs (
 			_r_show_message (
 				NULL,
 				MB_OK | MB_ICONINFORMATION | MB_TOPMOST,
-				L"Available options for memreduct.exe:",
-				L"-clean - clear default memory regions\r\n" \
-				L"-clean:full - clear all memory regions"
+				_r_locale_getstring (IDS_CMDLINE_HELP_TITLE),
+				_r_locale_getstring (IDS_CMDLINE_HELP_BODY)
 			);
 
 			return TRUE;
@@ -2454,6 +2576,8 @@ INT APIENTRY wWinMain (
 
 	if (!_r_app_initialize (&_app_parseargs))
 		return ERROR_APP_INIT_FAILURE;
+
+	_app_apply_default_language ();
 
 	hwnd = _r_app_createwindow (hinst, MAKEINTRESOURCEW (IDD_MAIN), MAKEINTRESOURCEW (IDI_MAIN), &DlgProc);
 
