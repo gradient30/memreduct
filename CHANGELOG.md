@@ -1,3 +1,16 @@
+v3.5.3 (22 June 2026)
+- split memory cleanup logic into memory.c module
+- added per-region cleanup status tracking and settings display
+- improved Native API error handling with NTSTATUS persistence
+- ensured SeProfileSingleProcessPrivilege before each cleanup
+- removed Win32 build configuration remnants
+- fixed main window handle initialization (removed HACK)
+- added CI build pipeline and smoke tests
+- unified version metadata across all release files
+- minimum supported OS raised to Windows 10 (x64/ARM64)
+- fixed cleanup status persistence across restarts
+- fixed Chinese localization for cleanup status strings
+
 v3.5.2 (1 April 2025)
 - added modified file cache clean
 - fixed pagefile displays wrong information (issue #262)

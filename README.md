@@ -18,7 +18,7 @@
 Lightweight real-time memory management application to monitor
 and clean system memory on your computer.
 
-The program used undocumented internal system features (Native API) to clear system cache (system working set, working set, standby page lists, modified page lists) with variable result ~10-50%. Application it is compatible with <s>Windows XP SP3</s> Windows 7 SP1 and higher operating systems.
+The program used undocumented internal system features (Native API) to clear system cache (system working set, working set, standby page lists, modified page lists) with variable result ~10-50%. Application it is compatible with Windows 10 and higher operating systems (64-bit/ARM64).
 
 You can download either the installer or portable version. For correct working you are require administrator rights.
 
@@ -27,9 +27,8 @@ To activate portable mode, create "memreduct.ini" in application folder, or move
 ```
 
 ### System requirements:
-- Windows 7, 8, 8.1, 10, 11 64-bit/ARM64
+- Windows 10, 11 64-bit/ARM64
 - An SSE2-capable CPU
-- <s>KB2533623</s> [KB3063858](https://www.microsoft.com/en-us/download/details.aspx?id=47442) update for Windows 7 was required
 
 ### Donate:
 - [Bitcoin](https://www.blockchain.com/btc/address/1LrRTXPsvHcQWCNZotA9RcwjsGcRghG96c) (BTC)
