@@ -1,15 +1,30 @@
 .vs/
 .vscode/
+.cursor/
 temp/
 packages/
 bin/32/
 bin/64/
 bin/arm64/
-build/
+bin/memreduct.ini
+# 打包输出（唯一正确目录为 build/，勿使用带尾部空格的 build ）
+/build/
+/build /
 x64/
 win32/
 arm64/
 __pycache__
+
+# 本地/临时脚本与交接文件（勿提交）
+chinese_ini_utf8.txt
+fix_memory.py
+scripts/fix_memory.py
+scripts/remove_dup.py
+scripts/chinese_ini_content.txt
+scripts/HANDOFF_SESSION.txt
+HANDOFF_SESSION.md
+HANDOFF_SESSION.txt
+docs/SESSION_HANDOFF.md
 
 thumbs.db
 ehthumbs.db

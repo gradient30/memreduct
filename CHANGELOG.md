@@ -1,3 +1,23 @@
+# 更新日志
+
+本文件记录 [gradient30/memreduct](https://github.com/gradient30/memreduct) 的变更。3.5.2 及更早版本条目来自上游 [henrypp/memreduct](https://github.com/henrypp/memreduct)。
+
+---
+
+## v3.5.3（gradient30 · 2026-06-22）
+
+本 fork 在 upstream v3.5.3 基础上的额外变更：
+
+- 全面简体中文界面与内置字符串汉化
+- 修复最小化到托盘后图标丢失问题
+- 完善本地构建脚本（`build_all.bat`、`mountmgr_compat` 兼容旧 routine SDK）
+- 打包输出目录改为仓库内 `build/`
+- 设置 → 内存清理：新增区域说明帮助按钮（?）
+
+---
+
+## v3.5.3（upstream · 2026-06-22）
+
 v3.5.3 (22 June 2026)
 - split memory cleanup logic into memory.c module
 - added per-region cleanup status tracking and settings display
@@ -10,6 +30,21 @@ v3.5.3 (22 June 2026)
 - minimum supported OS raised to Windows 10 (x64/ARM64)
 - fixed cleanup status persistence across restarts
 - fixed Chinese localization for cleanup status strings
+
+
+**上游变更摘要（中文）：**
+
+- 将内存清理逻辑拆分为 memory.c 模块
+- 新增各区域清理状态跟踪与设置页显示
+- 改进 Native API 错误处理，持久化 NTSTATUS
+- 每次清理前确保 SeProfileSingleProcessPrivilege
+- 移除 Win32 构建配置残留
+- 修复主窗口句柄初始化（移除 HACK）
+- 新增 CI 构建流水线与冒烟测试
+- 统一各发行文件中的版本元数据
+- 最低支持系统提升至 Windows 10（x64/ARM64）
+- 修复重启后清理状态持久化
+- 修复清理状态相关中文字符串
 
 v3.5.2 (1 April 2025)
 - added modified file cache clean

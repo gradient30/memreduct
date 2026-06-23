@@ -1,15 +1,15 @@
 ---
-name: Question
-about: Ask a question about application.
-title: '[Question]'
+name: 提问
+about: 关于本应用的使用或行为提问。
+title: '[提问]'
 labels: [ "question" ]
 assignees: ''
 
 ---
 
-Describe the question with as much detail as possible.
+请尽可能详细地描述您的问题。
 
 ---
 
-App version: <enter app version here>
-Windows version: <enter windows version here>
+应用版本：<在此填写，例如 3.5.3>
+Windows 版本：<在此填写，例如 Windows 11 23H2 x64>

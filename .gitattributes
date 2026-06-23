@@ -6,3 +6,4 @@
 *.txt diff
 *.xml diff
 *.lng diff
+*.md text eol=lf
