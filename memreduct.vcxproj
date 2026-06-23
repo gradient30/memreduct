@@ -253,6 +253,7 @@
     <ClCompile Include="..\routine\src\routine.c" />
     <ClCompile Include="src\main.c" />
     <ClCompile Include="src\memory.c" />
+    <ClCompile Include="src\mountmgr_compat.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\routine\src\ntapi.h" />
@@ -263,6 +264,7 @@
     <ClInclude Include="..\routine\src\rtypes.h" />
     <ClInclude Include="src\app.h" />
     <ClInclude Include="src\main.h" />
+    <ClInclude Include="src\mountmgr_compat.h" />
     <ClInclude Include="src\memory.h" />
     <ClInclude Include="src\resource.h" />
   </ItemGroup>

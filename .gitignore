@@ -5,6 +5,7 @@ packages/
 bin/32/
 bin/64/
 bin/arm64/
+build/
 x64/
 win32/
 arm64/

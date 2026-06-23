@@ -25,7 +25,7 @@ static const ULONG region_mask_list[] = {
 	REDUCT_COMBINE_MEMORY_LISTS,
 };
 
-LPCWSTR _app_get_region_title (
+LPWSTR _app_get_region_title (
 	_In_ ULONG mask_bit
 )
 {
@@ -73,7 +73,7 @@ LPCWSTR _app_get_region_title (
 	return _r_locale_getstring (string_id);
 }
 
-LPCWSTR _app_get_region_title_by_enum (
+LPWSTR _app_get_region_title_by_enum (
 	_In_ CLEANUP_REGION_ENUM region
 )
 {
@@ -122,7 +122,7 @@ VOID _app_apply_default_language ()
 
 	if (language)
 	{
-		if (!_r_str_isempty (&language->sr))
+		if (language->length > 0)
 		{
 			_r_obj_dereference (language);
 
@@ -132,7 +132,7 @@ VOID _app_apply_default_language ()
 		_r_obj_dereference (language);
 	}
 
-	_r_config_setstring (L"Language", L"Chinese (Simplified)");
+	_r_config_setstring (L"Language", L"Chinese (Simplified)", NULL);
 
 	_r_obj_movereference (&app_global.locale.resource_name, _r_obj_createstring (L"Chinese (Simplified)"));
 	_r_obj_movereference (&app_global.locale.current_name, _r_obj_createstring (L"Chinese (Simplified)"));
@@ -169,7 +169,7 @@ VOID _app_generate_array (
 {
 	PR_HASHTABLE hashtable;
 	ULONG_PTR enum_key = 0;
-	ULONG hash_code;
+	ULONG_PTR hash_code;
 	ULONG index = 0;
 
 	RtlSecureZeroMemory (integers, sizeof (ULONG) * count);
@@ -190,7 +190,7 @@ VOID _app_generate_array (
 	while (_r_obj_enumhashtable (hashtable, NULL, &hash_code, &enum_key))
 	{
 		if (hash_code <= 99)
-			*(PULONG_PTR)PTR_ADD_OFFSET (integers, index * sizeof (ULONG)) = hash_code;
+			*(PULONG)PTR_ADD_OFFSET (integers, index * sizeof (ULONG)) = (ULONG)hash_code;
 
 		if (++index >= count)
 			break;
@@ -343,6 +343,10 @@ VOID _app_drawbackground (
 	SetBkColor (hdc, prev_clr);
 }
 
+VOID _app_iconinit (
+	_In_ LONG dpi_value
+);
+
 HICON _app_iconcreate (
 	_In_opt_ ULONG percent
 )
@@ -377,6 +381,14 @@ HICON _app_iconcreate (
 		_app_getmemoryinfo (&mem_info);
 
 		percent = mem_info.physical_memory.percent;
+	}
+
+	if (!config.hdc)
+	{
+		_app_iconinit (_r_dc_gettaskbardpi ());
+
+		if (!config.hdc)
+			return NULL;
 	}
 
 	has_danger = percent >= _app_getdangervalue ();
@@ -590,6 +602,24 @@ VOID _app_iconredraw (
 
 	if (hwnd)
 		_app_timercallback (hwnd, 0, UID, 0);
+}
+
+VOID _app_tray_register (
+	_In_ HWND hwnd
+)
+{
+	LONG dpi_value;
+	HICON hicon;
+
+	dpi_value = _r_dc_gettaskbardpi ();
+
+	if (!config.hdc)
+		_app_iconinit (dpi_value);
+
+	hicon = _app_iconcreate (0);
+
+	_r_tray_destroy (hwnd, &GUID_TrayIcon);
+	_r_tray_create (hwnd, &GUID_TrayIcon, RM_TRAYICON, hicon, _r_app_getname (), FALSE);
 }
 
 VOID _app_iconinit (
@@ -1726,9 +1756,7 @@ INT_PTR CALLBACK DlgProc (
 
 			_app_iconinit (dpi_value);
 
-			_r_tray_create (hwnd, &GUID_TrayIcon, RM_TRAYICON, _app_iconcreate (0), _r_app_getname (), FALSE);
-
-			_app_iconredraw (hwnd);
+			_app_tray_register (hwnd);
 
 			break;
 		}
@@ -1749,9 +1777,7 @@ INT_PTR CALLBACK DlgProc (
 
 			_app_iconinit (dpi_value);
 
-			_r_tray_create (hwnd, &GUID_TrayIcon, RM_TRAYICON, _app_iconcreate (0), _r_app_getname (), FALSE);
-
-			_app_iconredraw (hwnd);
+			_app_tray_register (hwnd);
 
 			break;
 		}
@@ -1856,6 +1882,8 @@ INT_PTR CALLBACK DlgProc (
 		{
 			if (wparam)
 				_app_iconredraw (hwnd);
+			else
+				_app_tray_register (hwnd);
 
 			break;
 		}
@@ -1899,7 +1927,7 @@ INT_PTR CALLBACK DlgProc (
 						ClientToScreen (nmlp->hwndFrom, (PPOINT)&rect);
 
 						_r_wnd_recttorectangle (&rectangle, &rect);
-						_r_wnd_adjustrectangletoworkingarea (nmlp->hwndFrom, &rectangle);
+						_r_wnd_adjustrectangletoworkingarea (&rectangle, nmlp->hwndFrom);
 						_r_wnd_rectangletorect (&rect, &rectangle);
 
 						_r_menu_popup (hsubmenu, hwnd, (PPOINT)&rect, TRUE);

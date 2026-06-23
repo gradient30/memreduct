@@ -8,14 +8,25 @@
 #include "resource.h"
 #include "app.h"
 
+// memreduct uses 3-arg config helpers; map to routine _ex API
+#define _r_config_getboolean(key, def, section) _r_config_getboolean_ex ((key), (def), (section))
+#define _r_config_getlong(key, def, section) _r_config_getlong_ex ((key), (def), (section))
+#define _r_config_getlong64(key, def, section) _r_config_getlong64_ex ((key), (def), (section))
+#define _r_config_getulong(key, def, section) _r_config_getulong_ex ((key), (def), (section))
+#define _r_config_getulong64(key, def, section) _r_config_getulong64_ex ((key), (def), (section))
+#define _r_config_setboolean(key, val, section) _r_config_setboolean_ex ((key), (val), (section))
+#define _r_config_setlong(key, val, section) _r_config_setlong_ex ((key), (val), (section))
+#define _r_config_setlong64(key, val, section) _r_config_setlong64_ex ((key), (val), (section))
+#define _r_config_setulong(key, val, section) _r_config_setulong_ex ((key), (val), (section))
+#define _r_config_setulong64(key, val, section) _r_config_setulong64_ex ((key), (val), (section))
+#define _r_config_setstring(key, val, section) _r_config_setstring_ex ((key), (val), (section))
+#define _r_config_getfont(key, logfont, dpi, section) _r_config_getfont_ex ((key), (logfont), (dpi), (section))
+#define _r_config_setfont(key, logfont, dpi, section) _r_config_setfont_ex ((key), (logfont), (dpi), (section))
+
 DEFINE_GUID (GUID_TrayIcon, 0xAE9053F0, 0x8D59, 0x4803, 0x9A, 0xBB, 0x74, 0xAF, 0xE6, 0x6B, 0x5F, 0xD2);
 
-LPCWSTR _app_get_region_title (
+LPWSTR _app_get_region_title (
 	_In_ ULONG mask_bit
-);
-
-LPCWSTR _app_get_region_title_by_enum (
-	_In_ CLEANUP_REGION_ENUM region
 );
 
 #define TIMER 1000
