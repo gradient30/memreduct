@@ -9,6 +9,9 @@ on:
 jobs:
   build-x64:
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: cmd
     steps:
       - name: Checkout memreduct
         uses: actions/checkout@v4
@@ -22,16 +25,16 @@ jobs:
           path: routine
 
       - name: Verify version metadata
-        shell: cmd
-        run: memreduct\scripts\verify_version.bat
+        working-directory: memreduct
+        run: call scripts\verify_version.bat
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
       - name: Build Release x64
-        shell: cmd
-        run: msbuild memreduct\memreduct.sln /p:Configuration=Release /p:Platform=x64 /m
+        working-directory: memreduct
+        run: msbuild memreduct.sln /p:Configuration=Release /p:Platform=x64 /m /v:minimal
 
       - name: Smoke test
-        shell: cmd
-        run: memreduct\scripts\smoke_test.bat memreduct\bin\64\memreduct.exe
+        working-directory: memreduct
+        run: call scripts\smoke_test.bat bin\64\memreduct.exe
