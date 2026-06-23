@@ -94,6 +94,18 @@ LPWSTR _app_get_region_title_by_enum (
 	return _app_get_region_title (region_masks[region]);
 }
 
+VOID _app_show_regions_help (
+	_In_ HWND hwnd
+)
+{
+	_r_show_message (
+		hwnd,
+		MB_OK | MB_ICONINFORMATION,
+		_r_locale_getstring (IDS_REGIONS_HELP_TITLE),
+		_r_locale_getstring (IDS_REGIONS_HELP_BODY)
+	);
+}
+
 LPCWSTR _app_getcleanupreason (
 	_In_ CLEANUP_SOURCE_ENUM src
 )
@@ -1265,6 +1277,14 @@ INT_PTR CALLBACK SettingsProc (
 
 			switch (ctrl_id)
 			{
+				case IDC_REGIONS_HELP:
+				{
+					if (notify_code == BN_CLICKED)
+						_app_show_regions_help (hwnd);
+
+					break;
+				}
+
 				case IDC_AUTOREDUCTVALUE_CTRL:
 				{
 					LONG value;

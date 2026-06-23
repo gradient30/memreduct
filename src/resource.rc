@@ -135,7 +135,8 @@ FONT 8, "Ms Shell Dlg"
 {
 	GROUPBOX		"", IDC_TITLE_3, 0, 0, 260, 90
 
-	CONTROL			"", IDC_REGIONS, WC_LISTVIEW, LVS_REPORT | LVS_NOCOLUMNHEADER | LVS_SHAREIMAGELISTS | WS_BORDER | WS_TABSTOP | WS_VSCROLL, 8, 12, 244, 70
+	CONTROL			"", IDC_REGIONS, WC_LISTVIEW, LVS_REPORT | LVS_NOCOLUMNHEADER | LVS_SHAREIMAGELISTS | WS_BORDER | WS_TABSTOP | WS_VSCROLL, 8, 12, 222, 70
+	PUSHBUTTON		"?", IDC_REGIONS_HELP, 234, 12, 18, 14, WS_TABSTOP
 
 	GROUPBOX		"", IDC_TITLE_4, 0, 90, 260, 46
 
@@ -352,6 +353,8 @@ STRINGTABLE
 	IDS_REGION_UNKNOWN "未知"
 	IDS_CMDLINE_HELP_TITLE "memreduct.exe 可用选项："
 	IDS_CMDLINE_HELP_BODY "-clean - 清理默认内存区域\r\n-clean:full - 清理全部内存区域"
+	IDS_REGIONS_HELP_TITLE "内存区域清理说明"
+	IDS_REGIONS_HELP_BODY "【前提】清理内存需要管理员权限；未提权时无法更改选项或执行清理。\r\n\r\n【各选项含义与影响】\r\n• 工作集：回收各进程近期未使用的物理内存。影响较小，适合日常使用。\r\n• 系统文件缓存：释放系统用于加速读盘的文件缓存。可能短暂增加磁盘读取，通常可接受。\r\n• 备用列表（无优先级）：清理低优先级待机页，收益与风险较均衡。\r\n• 已修改文件缓存：释放已修改但仍驻留内存的文件数据，中等影响。\r\n• 注册表缓存 (Win8.1+)：清理注册表相关缓存，需较新系统。\r\n• 合并内存列表 (Win10+)：合并相似内存页以节省空间，影响因系统负载而异。\r\n• 备用列表* / 已修改页列表*：清理范围更大，可能造成数秒至约一分钟无响应；内存并不紧张时收益有限、副作用更明显。\r\n\r\n【手动 vs 自动】\r\n• 手动清理：按当前勾选项执行，带*项也可勾选。\r\n• 自动/定时/快捷键：默认会排除带*项；仅在「高级」中启用“允许在自动清理时清理备用列表和已修改页列表”后，自动清理才会包含它们。\r\n\r\n【使用建议】\r\n• 日常办公/浏览：保持默认勾选项即可，内存占用偏高时再手动清理。\r\n• 游戏/直播/剪辑：避免在运行大型程序时清理；不要启用带*项；优先关闭不用的程序。\r\n• 内存已充足（约低于 70%）：频繁清理意义不大，可能增加磁盘 IO。\r\n• 内存紧张（约高于 85%）：可先清理默认项；仍慎用带*项。\r\n\r\n带*项首次启用时程序会额外提示确认，请仔细阅读后再决定。"
 	IDS_CLEANUP_REASON_AUTO "清理（自动）"
 	IDS_CLEANUP_REASON_MANUAL "清理（手动）"
 	IDS_CLEANUP_REASON_HOTKEY "清理（快捷键）"
