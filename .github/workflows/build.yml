@@ -28,6 +28,24 @@ jobs:
         working-directory: memreduct
         run: call scripts\verify_version.bat
 
+      - name: Verify Web cleanup
+        working-directory: memreduct
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\test_web_clean.ps1
+
+      - name: Verify Web HTTP
+        working-directory: memreduct
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\test_web_http.ps1
+
+      - name: Verify Clash bridge
+        working-directory: memreduct
+        timeout-minutes: 3
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\test_clash_http.ps1
+
+      - name: Verify dashboard rendering
+        working-directory: memreduct
+        timeout-minutes: 2
+        run: python tests\test_web_render.py
+
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
@@ -35,6 +53,11 @@ jobs:
         working-directory: memreduct
         run: msbuild memreduct.sln /p:Configuration=Release /p:Platform=x64 /m /v:minimal
 
+      - name: Verify smoke-test behavior
+        working-directory: memreduct
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\test_smoke_script.ps1
+
       - name: Smoke test
         working-directory: memreduct
+        timeout-minutes: 2
         run: call scripts\smoke_test.bat bin\64\memreduct.exe

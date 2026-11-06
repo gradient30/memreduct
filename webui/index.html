@@ -96,6 +96,7 @@ select:hover{border-color:var(--line2)}
 .btn.primary:hover{box-shadow:0 0 0 1px rgba(255,176,0,.25),0 6px 22px rgba(255,176,0,.28)}
 .btn:disabled{opacity:.55;cursor:wait;transform:none}
 .btn:disabled span{animation:blink 1.1s infinite}
+.btn.nav{display:inline-flex;align-items:center;text-decoration:none}
 /* 刷新按钮 loading */
 @keyframes spin{to{transform:rotate(360deg)}}
 #btnRefresh .ic{display:inline-block;margin-right:2px}
@@ -226,6 +227,7 @@ footer b{color:var(--dim);font-weight:500}
 			</div>
 		</div>
 		<div class="ctrl">
+			<a class="btn nav" href="/clash">⇄ 代理节点</a>
 			<label class="selwrap">刷新
 				<select id="interval">
 					<option value="0" selected>手动</option>
@@ -338,6 +340,8 @@ let curIv = 0, timers = {}, failN = 0;
 
 const fmt = (n,d=1) => Number(n).toFixed(d);
 const ftime = ts => new Date(ts).toLocaleTimeString('zh-CN',{hour12:false});
+const escapeHtml = value => String(value == null ? '' : value).replace(/[&<>"']/g, ch =>
+	({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[ch]);
 
 /* ---------- Sparkline ---------- */
 function drawSpark(cv, data, color){
@@ -396,8 +400,8 @@ function renderTemp(d){
 			const pk=peak.temp[s.id];
 			const st=l===2?'过热':(l===1?'偏高':'正常');
 			const tip=TIP[s.kind]||TIP.other;
-			return '<div class="trow" title="'+s.name+'：'+st+'（'+fmt(s.c)+'°C）&#10;&#10;'+tip+'">'+
-				'<div class="tname">'+s.name+'</div>'+
+			return '<div class="trow" title="'+escapeHtml(s.name)+'：'+st+'（'+fmt(s.c)+'°C）&#10;&#10;'+tip+'">'+
+				'<div class="tname">'+escapeHtml(s.name)+'</div>'+
 				'<div class="tbar"><div class="fill '+l+'" style="width:'+Math.min(s.c,100)+'%"></div></div>'+
 				'<div class="tval '+l+'">'+fmt(s.c)+'°C</div>'+
 				'<div class="tpeak">峰'+fmt(pk,0)+'°</div></div>';
@@ -422,8 +426,8 @@ function renderDrive(d){
 		if (freePct<10 || v.freeGB<10) l=2; else if (freePct<20 || v.freeGB<20) l=1;
 		worst=Math.max(worst,l);
 		return '<div class="drow">'+
-			'<div class="dletter '+CLS[l]+'">'+v.letter.replace(':','')+'</div>'+
-			'<div><div class="dtop"><span class="dlabel">'+(v.label||'本地磁盘')+'</span>'+
+			'<div class="dletter '+CLS[l]+'">'+escapeHtml(v.letter.replace(':',''))+'</div>'+
+			'<div><div class="dtop"><span class="dlabel">'+escapeHtml(v.label||'本地磁盘')+'</span>'+
 			'<span class="dfree '+CLS[l]+'">剩余 '+fmt(v.freeGB)+' / '+fmt(v.totalGB)+' GB</span></div>'+
 			'<div class="meter"><div class="fill '+CLS[l]+'" style="width:'+v.usedPct+'%"></div></div></div>'+
 			'<div class="dpct"><b class="'+CLS[l]+'">'+fmt(v.usedPct)+'%</b><span>已用</span></div></div>';

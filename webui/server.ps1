@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 	MEM.REDUCT webui — 轻量本机监控服务 (零依赖)
 
@@ -392,6 +392,7 @@ function Invoke-Clean
 # 依据请求 Origin 计算 Access-Control-Allow-Origin 行 (无 Origin 或不在白名单时返回空)
 function Get-CorsLine
 {
+	if ( $script:ReqIsClash ) { return '' }
 	$origin = $script:ReqOrigin
 	if ( -not $origin ) { return '' }
 	if ( $CorsOrigins -contains '*' ) { return "Access-Control-Allow-Origin: *`r`n" }
@@ -404,10 +405,13 @@ function Send-Response
 	param ( $Stream, [string]$Type, [byte[]]$Bytes, [int]$Code = 200 )
 	$reason = 'OK'
 	if ( $Code -eq 204 ) { $reason = 'No Content' }
+	if ( $Code -eq 400 ) { $reason = 'Bad Request' }
 	if ( $Code -eq 401 ) { $reason = 'Unauthorized' }
 	if ( $Code -eq 403 ) { $reason = 'Forbidden' }
 	if ( $Code -eq 404 ) { $reason = 'Not Found' }
 	if ( $Code -eq 405 ) { $reason = 'Method Not Allowed' }
+	if ( $Code -eq 409 ) { $reason = 'Conflict' }
+	if ( $Code -eq 503 ) { $reason = 'Service Unavailable' }
 	$head = "HTTP/1.1 $Code $reason`r`nContent-Type: $Type`r`nContent-Length: $($Bytes.Length)`r`nConnection: close`r`nCache-Control: no-store`r`n"
 	$head += (Get-CorsLine)
 	$head += "`r`n"
@@ -451,13 +455,29 @@ function Test-ApiKey
 
 function Send-Json
 {
-	param ( $Stream, $Obj )
+	param ( $Stream, $Obj, [int]$Code = 200 )
 	$json = [Text.Encoding]::UTF8.GetBytes(($Obj | ConvertTo-Json -Depth 6 -Compress))
-	Send-Response $Stream 'application/json; charset=utf-8' $json
+	Send-Response $Stream 'application/json; charset=utf-8' $json $Code
 }
 
 $HtmlBytes = $null
 if ( Test-Path $HtmlPath ) { $HtmlBytes = [IO.File]::ReadAllBytes($HtmlPath) }
+$ClashHtmlPath = Join-Path $PSScriptRoot 'clash.html'
+$ClashModulePath = Join-Path $PSScriptRoot 'clash.ps1'
+$ClashLoaded = Test-Path -LiteralPath $ClashModulePath -PathType Leaf
+if ( $ClashLoaded ) { . $ClashModulePath }
+
+function Get-QueryValue {
+	param ( [string]$Target, [string]$Name )
+	$question = $Target.IndexOf('?')
+	if ( $question -lt 0 ) { return '' }
+	foreach ( $part in ($Target.Substring($question + 1) -split '&') )
+	{
+		$pair = $part -split '=', 2
+		if ( $pair[0] -eq $Name -and $pair.Count -eq 2 ) { return [Uri]::UnescapeDataString($pair[1].Replace('+', ' ')) }
+	}
+	return ''
+}
 
 # 绑定地址: 本机回环 + Tailscale 网卡 (100.64.0.0/10 段, 不绑定局域网)
 $bindIps = @([Net.IPAddress]::Loopback)
@@ -530,11 +550,40 @@ while ( $true )
 		$script:ReqOrigin = $null
 		$script:ReqKey    = $null
 		$script:ReqPna    = $false
+		$script:ReqHost   = $null
+		$script:ReqIsClash = $false
+		# PowerShell 的路由比较可能忽略控制字符；无效请求目标必须在分发前拒绝。
+		if ( $parts[1] -match '[\x00-\x1F\x7F]' )
+		{
+			Send-Response $stream 'text/plain; charset=utf-8' ([Text.Encoding]::ASCII.GetBytes('invalid request target')) 400
+			continue
+		}
+		$script:ReqIsClash = ($path.Equals('/api/clash', [StringComparison]::OrdinalIgnoreCase) -or $path.StartsWith('/api/clash/', [StringComparison]::OrdinalIgnoreCase))
 		$script:ReqIsLocal = [Net.IPAddress]::IsLoopback(([Net.IPEndPoint]$client.Client.RemoteEndPoint).Address)
 		if ( $data -match '(?im)^origin:[ \t]*([^\r\n]+)' ) { $script:ReqOrigin = $Matches[1].Trim() }
+		if ( $data -match '(?im)^host:[ \t]*([^\r\n]+)' ) { $script:ReqHost = $Matches[1].Trim() }
 		if ( $data -match '(?im)^x-api-key:[ \t]*([^\r\n]+)' ) { $script:ReqKey = $Matches[1].Trim() }
 		if ( $data -match '(?im)^access-control-request-private-network:[ \t]*true' ) { $script:ReqPna = $true }
 		if ( $parts[1] -match '[?&]key=([^&\s]+)' ) { $script:ReqKey = [Uri]::UnescapeDataString($Matches[1]) }
+
+		# 节点控制只接受本机或本机 Tailscale 地址的同源请求，避免跨站和 DNS 重绑定。
+		if ( $script:ReqIsClash )
+		{
+			$allowedHosts = @('127.0.0.1', 'localhost', '::1') + $tsIps
+			$validHost = $false
+			try
+			{
+				$hostUri = [Uri]('http://' + $script:ReqHost)
+				$validHost = ($hostUri.Port -eq $Port -and $hostUri.AbsolutePath -eq '/' -and -not $hostUri.UserInfo -and $allowedHosts -contains $hostUri.Host.Trim('[', ']'))
+			}
+			catch { $validHost = $false }
+			$sameOrigin = $script:ReqOrigin -and ($script:ReqOrigin -ieq ('http://' + $script:ReqHost))
+			if ( -not $validHost -or $method -eq 'OPTIONS' -or ($script:ReqOrigin -and -not $sameOrigin) -or ($method -eq 'POST' -and -not $sameOrigin) )
+			{
+				Send-Json $stream ([ordered]@{ ok = $false; err = '请求来源不被允许' }) 403
+				continue
+			}
+		}
 
 		# CORS 预检请求 — 浏览器跨源 POST 前必经
 		if ( $method -eq 'OPTIONS' ) { Send-Preflight $stream; continue }
@@ -558,6 +607,11 @@ while ( $true )
 				if ( $HtmlBytes ) { Send-Response $stream 'text/html; charset=utf-8' $HtmlBytes }
 				else { Send-Response $stream 'text/plain; charset=utf-8' ([Text.Encoding]::UTF8.GetBytes('index.html 缺失')) 404 }
 			}
+			'/clash'
+			{
+				if ( Test-Path -LiteralPath $ClashHtmlPath ) { Send-Response $stream 'text/html; charset=utf-8' ([IO.File]::ReadAllBytes($ClashHtmlPath)) }
+				else { Send-Response $stream 'text/plain; charset=utf-8' ([Text.Encoding]::UTF8.GetBytes('代理页面缺失')) 404 }
+			}
 			'/favicon.ico'
 			{
 				$ico = [Text.Encoding]::UTF8.GetBytes('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" fill="#0a0e12"/><rect x="3" y="3" width="10" height="10" fill="none" stroke="#ffb000" stroke-width="1.5"/><rect x="6.5" y="6.5" width="3" height="3" fill="#ffb000"/></svg>')
@@ -566,6 +620,60 @@ while ( $true )
 			'/api/stats' { Send-Json $stream (Get-Stats) }
 			'/api/temp'  { Send-Json $stream (Get-Temps) }
 			'/api/drive' { Send-Json $stream (Get-Drives) }
+			'/api/clash'
+			{
+				if ( $method -ne 'GET' ) { Send-Json $stream ([ordered]@{ ok = $false; err = 'GET only' }) 405; continue }
+				if ( -not $ClashLoaded ) { Send-Json $stream ([ordered]@{ ok = $false; err = 'Clash 控制模块不可用' }) 503; continue }
+				try { Send-Json $stream (Get-ClashState) }
+				catch { Send-Json $stream ([ordered]@{ ok = $false; err = '无法连接 Clash 内核，请确认 Clash Verge 已启动且本机控制接口可用' }) 503 }
+			}
+			'/api/clash/select'
+			{
+				if ( $method -ne 'POST' ) { Send-Json $stream ([ordered]@{ ok = $false; err = 'POST only' }) 405; continue }
+				if ( -not $ClashLoaded ) { Send-Json $stream ([ordered]@{ ok = $false; err = 'Clash 控制模块不可用' }) 503; continue }
+				try
+				{
+					$group = Get-QueryValue $parts[1] 'group'; $node = Get-QueryValue $parts[1] 'node'
+					if ( Set-ClashSelection $group $node ) { Send-Json $stream ([ordered]@{ ok = $true }) }
+					else { Send-Json $stream ([ordered]@{ ok = $false; err = '代理组或节点无效' }) 400 }
+				}
+				catch { Send-Json $stream ([ordered]@{ ok = $false; err = '切换失败，请确认 Clash 内核运行正常' }) 503 }
+			}
+			'/api/clash/delay/start'
+			{
+				if ( $method -ne 'POST' ) { Send-Json $stream ([ordered]@{ ok = $false; err = 'POST only' }) 405; continue }
+				if ( -not $ClashLoaded ) { Send-Json $stream ([ordered]@{ ok = $false; err = 'Clash 控制模块不可用' }) 503; continue }
+				try
+				{
+					$group = Get-QueryValue $parts[1] 'group'; $node = Get-QueryValue $parts[1] 'node'
+					$id = Start-ClashDelay $group $node
+					if ( $id -is [bool] -and -not $id ) { Send-Json $stream ([ordered]@{ ok = $false; err = '代理组或节点无效' }) 400 }
+					elseif ( -not $id ) { Send-Json $stream ([ordered]@{ ok = $false; err = '已有测速任务在运行' }) 409 }
+					else { Send-Json $stream ([ordered]@{ ok = $true; id = $id }) }
+				}
+				catch { Send-Json $stream ([ordered]@{ ok = $false; err = '无法开始测速，请确认 Clash 内核运行正常' }) 503 }
+			}
+			'/api/clash/delay/status'
+			{
+				if ( $method -ne 'GET' ) { Send-Json $stream ([ordered]@{ ok = $false; err = 'GET only' }) 405; continue }
+				if ( -not $ClashLoaded ) { Send-Json $stream ([ordered]@{ ok = $false; err = 'Clash 控制模块不可用' }) 503; continue }
+				$result = Get-ClashDelay (Get-QueryValue $parts[1] 'id')
+				if ( $result ) { Send-Json $stream $result }
+				else { Send-Json $stream ([ordered]@{ ok = $false; err = '测速任务不存在' }) 404 }
+			}
+			'/api/clash/delay/current'
+			{
+				if ( $method -ne 'GET' ) { Send-Json $stream ([ordered]@{ ok = $false; err = 'GET only' }) 405; continue }
+				if ( -not $ClashLoaded ) { Send-Json $stream ([ordered]@{ ok = $false; err = 'Clash 控制模块不可用' }) 503; continue }
+				Send-Json $stream (Get-ClashCurrentDelay)
+			}
+			'/api/clash/delay/cancel'
+			{
+				if ( $method -ne 'POST' ) { Send-Json $stream ([ordered]@{ ok = $false; err = 'POST only' }) 405; continue }
+				if ( -not $ClashLoaded ) { Send-Json $stream ([ordered]@{ ok = $false; err = 'Clash 控制模块不可用' }) 503; continue }
+				if ( Stop-ClashDelay (Get-QueryValue $parts[1] 'id') ) { Send-Json $stream ([ordered]@{ ok = $true }) }
+				else { Send-Json $stream ([ordered]@{ ok = $false; err = '测速任务不存在' }) 404 }
+			}
 			'/api/clean'
 			{
 				if ( $method -eq 'POST' )

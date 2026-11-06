@@ -238,15 +238,16 @@ $ApiKey      = ''                      # 非空时 /api/* 需带头 X-Api-Key �
 
 ## 7. 安全与浏览器策略（接入前必读）
 
-1. **默认 CORS 全开（`*`）**：便于任意项目页面接入。清理动作只影响内存、不返回敏感数据（stats 含 CPU/内存/温度概况），个人机器风险可控。
-2. **收紧**：多人共用或公网可达的部署，把 `$CorsOrigins` 改为你的页面来源数组（见上），改完重启 server.ps1。
-3. **API Key**：设置 `$ApiKey = '你的密钥'` 后，前端加头即可：
+1. **默认 CORS 全开（`*`）**：便于其他页面接入，但也允许跨源页面读取监控数据；服务已提权或安装清理任务桥时，跨源页面还可能触发内存清理。
+2. **CORS 不是身份验证**：`$CorsOrigins` 控制浏览器读取响应和预检，不会阻止所有跨源简单 POST。仅收紧来源白名单不足以保护清理接口。
+3. **API Key**：设置 `$ApiKey = '你的密钥'` 后，所有 `/api/*` 调用均需携带密钥，例如：
    ```javascript
    headers: { 'Content-Type': 'application/json', 'X-Api-Key': '你的密钥' }
    ```
+   内置监控页面目前没有密钥输入功能；启用后需同时调整可信调用端以携带密钥，改完重启 server.ps1。
 4. **HTTPS 页面调本机 HTTP 服务**：现代浏览器（Chrome/Edge/Firefox）将 `http://127.0.0.1`、`http://localhost` 视为可信来源，**公网 HTTPS 页面可直接调用，不会被判 mixed content**。服务端已支持 Private Network Access 预检（`Access-Control-Allow-Private-Network: true`）。
 5. **远程地址（Tailscale IP）没有此豁免**：HTTPS 页面直连 `http://100.x.x.x:8765` 会被 mixed content 拦截——远程场景请用方式 B（后端代理）。
-6. **服务绑定范围**：仅回环 + Tailscale 网卡，不监听局域网；Tailnet 入站需一次性放行防火墙。
+6. **服务绑定范围**：服务监听回环以及本机 `100.64.0.0/10` 段的 IPv4 地址。若其他网卡也使用此地址段，它们同样会被监听；Tailnet 入站需一次性放行防火墙。
 
 ## 8. 真实验证记录（2026-10-07 · Win10 19045 · 48GB · Chrome 138 headless）
 

@@ -47,6 +47,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\mem-clean.ps1 -All -
 powershell -NoProfile -ExecutionPolicy Bypass -File webui\server.ps1
 ```
 
+从外网访问时，在远程设备登录同一个 Tailscale 网络；在运行服务的电脑上执行 `tailscale ip -4` 查询地址，然后在远程设备打开 `http://<Tailscale IPv4>:8765/`。电脑和 Web 服务需要保持运行；如防火墙尚未放行，可用管理员权限运行 `webui/add_firewall_rule.ps1`。
+
+远程执行内存清理还需要已提权的 Web 服务，或由管理员运行一次 `scripts/install_clean_task.ps1` 安装计划任务桥。本机页面仍可按需请求 Windows 管理员授权。
+
+如果监控服务已经在运行，更新代码后可执行 `powershell -NoProfile -ExecutionPolicy Bypass -File webui/restart_webui.ps1`，脚本会核对现有监听进程后重启服务。
+
+### 远程代理节点
+
+启动 Clash Verge 和 Web 监控服务后，从监控台进入“代理节点”，或访问 `/clash`。页面支持选择代理组、搜索节点、单节点或全组测速、取消测速和切换节点；测速目标与超时优先使用 Clash Verge 当前运行配置。切换后，新连接使用所选节点。
+
+控制器仅在本机连接：优先使用本机 Mihomo HTTP 控制接口，未启用时尝试 Clash Verge 的本地命名管道；控制器密钥不会发送到网页。命名管道属于 Clash Verge 的内部接口，升级后若不可用，可在 Clash Verge 中启用仅监听 `127.0.0.1` 的外部控制器。能访问 Web 页面的 Tailscale 设备可切换本机代理，请按需配置 Tailnet 访问权限。
+
 ### 系统要求
 
 - Windows 10 / 11（64 位或 ARM64）
