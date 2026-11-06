@@ -354,7 +354,7 @@ VOID _app_memoryclean (
 			else
 			{
 				if (hwnd)
-					_r_tray_popup (hwnd, &GUID_TrayIcon, flags, _r_app_getname (), error_text);
+					_app_tray_popup (hwnd, flags, _r_app_getname (), error_text);
 			}
 		}
 
@@ -601,7 +601,7 @@ VOID _app_memoryclean (
 		if (_r_config_getboolean (L"BalloonCleanResults", TRUE, NULL))
 		{
 			if (hwnd)
-				_r_tray_popup (hwnd, &GUID_TrayIcon, flags, _r_app_getname (), buffer2);
+				_app_tray_popup (hwnd, flags, _r_app_getname (), buffer2);
 			else
 				_r_show_message (hwnd, MB_OK | MB_ICONINFORMATION, NULL, buffer2);
 		}
@@ -613,7 +613,7 @@ VOID _app_memoryclean (
 	else
 	{
 		if (hwnd && _r_config_getboolean (L"BalloonCleanResults", TRUE, NULL))
-			_r_tray_popup (hwnd, &GUID_TrayIcon, flags, _r_app_getname (), buffer2);
+			_app_tray_popup (hwnd, flags, _r_app_getname (), buffer2);
 	}
 
 	if (_r_config_getboolean (L"LogCleanResults", FALSE, NULL))

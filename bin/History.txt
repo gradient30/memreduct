@@ -1,3 +1,8 @@
+v3.5.4 (6 November 2026)
+- hide the Help menu on the main window
+- fixed notification icon registration for installed and portable copies
+- allow local web cleanup to request administrator approval when the task bridge is unavailable
+
 v3.5.3 (22 June 2026)
 - split memory cleanup logic into memory.c module
 - added per-region cleanup status tracking and settings display

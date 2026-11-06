@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>MEM·REDUCT 系统监控台</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230a0e12'/><rect x='3' y='3' width='10' height='10' fill='none' stroke='%23ffb000' stroke-width='1.5'/><rect x='6.5' y='6.5' width='3' height='3' fill='%23ffb000'/></svg>">
+<style>
+:root, body[data-theme="dark"]{
+	--bg:#0a0e12; --panel:#10161d; --panel2:#0c1117;
+	--line:#22303a; --line2:#31424f;
+	--ink:#dbe4ea; --dim:#71828f; --dim2:#4d5c68;
+	--amber:#ffb000; --green:#3ddc84; --cyan:#43c6de;
+	--warn:#ff9f2e; --danger:#ff4d5e;
+	--gridline:rgba(255,255,255,.018); --scan:rgba(255,255,255,.022); --vig:rgba(4,7,10,.55);
+	--btn1:#161e26; --btn2:#111820; --btnlh:#425767; --meterbg:#070b0e; --dash:#182430; --soft:#a9b8c4;
+	--shadow:rgba(0,0,0,.4); --shadow2:rgba(0,0,0,.55);
+	--mono:'Cascadia Mono',Consolas,'Courier New',monospace;
+	--disp:'Bahnschrift','Microsoft YaHei',sans-serif;
+}
+body[data-theme="light"]{
+	--bg:#e9edf1; --panel:#ffffff; --panel2:#f4f7fa;
+	--line:#d4dde4; --line2:#b9c6d1;
+	--ink:#1b2632; --dim:#5c6b78; --dim2:#8b99a5;
+	--amber:#d98e00; --green:#1d9e5f; --cyan:#1893b5;
+	--warn:#d97a12; --danger:#d83849;
+	--gridline:rgba(0,0,0,.035); --scan:transparent; --vig:rgba(160,175,190,.2);
+	--btn1:#ffffff; --btn2:#eef2f5; --btnlh:#9fb2c2; --meterbg:#dde5eb; --dash:#d4dde4; --soft:#3d4c5a;
+	--shadow:rgba(30,45,60,.18); --shadow2:rgba(30,45,60,.28);
+}
+body[data-theme="color"]{
+	--bg:#12071f; --panel:#1b0f2e; --panel2:#150b26;
+	--line:#3d2a5c; --line2:#584077;
+	--ink:#efe6ff; --dim:#a08fc4; --dim2:#6f5f96;
+	--amber:#ffd166; --green:#06d6a0; --cyan:#4cc9f0;
+	--warn:#ff8fab; --danger:#ff4365;
+	--gridline:rgba(255,255,255,.03); --scan:rgba(255,255,255,.016); --vig:rgba(8,2,18,.55);
+	--btn1:#241640; --btn2:#1b0f2e; --btnlh:#7c5fb8; --meterbg:#0d0518; --dash:#2c1c48; --soft:#cdb9ef;
+	--shadow:rgba(20,5,40,.5); --shadow2:rgba(20,5,40,.65);
+}
+/* 彩色主题: 渐变标题 + 每卡独立 accent */
+body[data-theme="color"] h1{
+	background:linear-gradient(90deg,#4cc9f0,#ffd166,#ff8fab);-webkit-background-clip:text;background-clip:text;color:transparent}
+body[data-theme="color"] h1 em{background:none;-webkit-background-clip:initial;background-clip:initial;color:var(--ink)}
+body[data-theme="color"] .led.ok{box-shadow:0 0 12px var(--green),0 0 22px rgba(6,214,160,.35)}
+body[data-theme="color"] .card{box-shadow:0 0 0 1px rgba(124,95,184,.08),0 8px 26px rgba(20,5,40,.35)}
+body[data-theme="color"] .banner.ok{background:linear-gradient(90deg,rgba(6,214,160,.09),transparent 60%)}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scrollbar-color:var(--line2) var(--bg)}
+body{
+	background:var(--bg); color:var(--ink); font-family:var(--mono);
+	background-image:
+		linear-gradient(var(--gridline) 1px,transparent 1px),
+		linear-gradient(90deg,var(--gridline) 1px,transparent 1px);
+	background-size:44px 44px;
+	min-height:100vh;
+}
+/* 扫描线 + 暗角 */
+body::before{content:'';position:fixed;inset:0;z-index:50;pointer-events:none;
+	background:repeating-linear-gradient(0deg,var(--scan) 0 1px,transparent 1px 3px)}
+body::after{content:'';position:fixed;inset:0;z-index:49;pointer-events:none;
+	background:radial-gradient(ellipse 120% 90% at 50% 0%,transparent 55%,var(--vig))}
+.wrap{max-width:1180px;margin:0 auto;padding:22px 20px 34px;position:relative;z-index:2}
+
+/* ---------- 开机入场 ---------- */
+@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.boot{animation:rise .55s cubic-bezier(.22,1,.36,1) backwards}
+
+/* ---------- 头部 ---------- */
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;padding-bottom:14px;animation-delay:.02s}
+.brand{display:flex;gap:14px;align-items:center}
+.led{width:9px;height:9px;border-radius:50%;flex:none;transition:.3s}
+.led.ok{background:var(--green);box-shadow:0 0 9px var(--green);animation:pulse 2.6s infinite}
+.led.warn{background:var(--warn);box-shadow:0 0 9px var(--warn);animation:blink 1.6s infinite}
+.led.danger{background:var(--danger);box-shadow:0 0 9px var(--danger);animation:blink 1s infinite}
+.led.off{background:var(--dim2);box-shadow:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+h1{font-family:var(--disp);font-weight:700;font-size:21px;letter-spacing:.05em;color:var(--amber);line-height:1.15}
+h1 em{font-style:normal;color:var(--ink);margin-left:8px;font-weight:600}
+.sub{font-size:9.5px;color:var(--dim);letter-spacing:.32em;margin-top:3px}
+.ctrl{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.selwrap{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--dim);letter-spacing:.1em}
+select{appearance:none;-webkit-appearance:none;background:var(--panel2) url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='5'><path d='M0 0l4 5 4-5z' fill='%2371828f'/></svg>") no-repeat right 9px center;
+	border:1px solid var(--line);color:var(--ink);font-family:var(--mono);font-size:11.5px;
+	padding:7px 26px 7px 10px;border-radius:3px;cursor:pointer}
+select:hover{border-color:var(--line2)}
+.btn{font-family:var(--disp);font-weight:600;font-size:12px;letter-spacing:.14em;
+	padding:9px 17px;border-radius:3px;cursor:pointer;transition:transform .12s,box-shadow .2s,border-color .2s;
+	border:1px solid var(--line2);background:linear-gradient(180deg,var(--btn1),var(--btn2));color:var(--ink)}
+.btn:hover{transform:translateY(-1px);border-color:var(--btnlh);box-shadow:0 4px 14px var(--shadow)}
+.btn:active{transform:translateY(0)}
+.btn.primary{background:linear-gradient(180deg,#ffc233,#f5a800);border-color:#ffd061;color:#181200;
+	box-shadow:0 0 0 1px rgba(255,176,0,.12),0 4px 16px rgba(255,176,0,.16)}
+.btn.primary:hover{box-shadow:0 0 0 1px rgba(255,176,0,.25),0 6px 22px rgba(255,176,0,.28)}
+.btn:disabled{opacity:.55;cursor:wait;transform:none}
+.btn:disabled span{animation:blink 1.1s infinite}
+/* 刷新按钮 loading */
+@keyframes spin{to{transform:rotate(360deg)}}
+#btnRefresh .ic{display:inline-block;margin-right:2px}
+#btnRefresh.busy{pointer-events:none;opacity:.8}
+#btnRefresh.busy .ic{animation:spin .8s linear infinite}
+/* 标尺刻度线 */
+.rule{height:7px;border-top:1px solid var(--line);
+	background:repeating-linear-gradient(90deg,var(--line2) 0 1px,transparent 1px 16px) top/100% 5px no-repeat;
+	margin-bottom:16px;animation-delay:.06s}
+
+/* ---------- 状态横幅 ---------- */
+.banner{display:flex;align-items:center;gap:11px;padding:11px 16px;margin-bottom:15px;
+	border:1px solid var(--line);border-left:3px solid var(--dim2);border-radius:3px;
+	background:linear-gradient(90deg,rgba(255,255,255,.02),transparent 60%);animation-delay:.1s}
+.banner .bicon{font-size:15px;font-family:var(--disp);font-weight:700}
+.banner b{font-family:var(--disp);font-size:13px;letter-spacing:.08em}
+.banner span{font-size:11px;color:var(--dim)}
+.banner.ok{border-left-color:var(--green)}
+.banner.ok .bicon{color:var(--green)}
+.banner.warn{border-left-color:var(--warn);background:linear-gradient(90deg,rgba(255,159,46,.07),transparent 60%)}
+.banner.warn .bicon,.banner.warn b{color:var(--warn)}
+.banner.danger{border-left-color:var(--danger);background:linear-gradient(90deg,rgba(255,77,94,.08),transparent 60%)}
+.banner.danger .bicon,.banner.danger b{color:var(--danger)}
+
+/* ---------- 主网格 (按行填充: 第一行 CPU+MEM, 第二行 TEMP+DISK) ---------- */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:15px;align-items:stretch}
+
+/* ---------- 卡片 ---------- */
+.card{position:relative;background:linear-gradient(180deg,var(--panel),var(--panel2));
+	border:1px solid var(--line);border-radius:4px;padding:17px 19px 16px;
+	display:flex;flex-direction:column;min-height:236px}
+.card::before,.card::after{content:'';position:absolute;width:13px;height:13px;opacity:.55;pointer-events:none}
+.card::before{top:-1px;left:-1px;border-top:2px solid var(--acc,var(--amber));border-left:2px solid var(--acc,var(--amber))}
+.card::after{bottom:-1px;right:-1px;border-bottom:2px solid var(--acc,var(--amber));border-right:2px solid var(--acc,var(--amber))}
+.chead{display:flex;align-items:baseline;gap:10px;margin-bottom:13px}
+.tag{font-family:var(--disp);font-weight:600;font-size:13px;letter-spacing:.22em}
+.tag-sub{font-size:9.5px;color:var(--dim);letter-spacing:.15em}
+.chead .led{margin-left:auto;align-self:center}
+
+/* 大读数 */
+.readout{display:flex;align-items:baseline;gap:5px;margin-bottom:11px}
+.readout b{font-size:47px;font-weight:600;line-height:.95;font-variant-numeric:tabular-nums;transition:color .4s}
+.readout b.warn{color:var(--warn)} .readout b.danger{color:var(--danger)}
+.readout i{font-style:normal;font-size:17px;color:var(--dim)}
+.readout .side{margin-left:auto;font-size:10.5px;color:var(--dim);letter-spacing:.06em;text-align:right}
+
+/* 分段 LED 电平条 */
+.meter{position:relative;height:13px;background:var(--meterbg);border:1px solid var(--line);overflow:hidden}
+.meter .fill{height:100%;width:0;transition:width .7s cubic-bezier(.22,1,.36,1),background .4s}
+.meter::after{content:'';position:absolute;inset:0;pointer-events:none;
+	background:repeating-linear-gradient(90deg,transparent 0 9px,var(--panel2) 9px 11px)}
+.fill.ok{background:linear-gradient(180deg,#54f2a0,#26b168)}
+.fill.cy{background:linear-gradient(180deg,#6fdcf2,#2ba6c0)}
+.fill.am{background:linear-gradient(180deg,#ffc84d,#e09a00)}
+.fill.warn{background:linear-gradient(180deg,#ffb35c,#e07f00)}
+.fill.danger{background:linear-gradient(180deg,#ff7683,#e02036)}
+
+canvas.spark{width:100%;height:48px;display:block;margin-top:12px}
+.meta{display:flex;justify-content:space-between;gap:10px;margin-top:10px;font-size:10.5px;color:var(--dim)}
+.meta b{color:var(--ink);font-weight:500}
+.note{margin-top:auto;padding-top:10px;border-top:1px dashed var(--line);font-size:10px;color:var(--dim2);letter-spacing:.05em;line-height:1.7}
+.note b{color:var(--dim);font-weight:500}
+
+/* ---------- 温度列表 ---------- */
+.trow{display:grid;grid-template-columns:1fr 86px 64px 56px;gap:9px;align-items:center;
+	padding:8px 0;border-bottom:1px dashed var(--dash)}
+.trow:last-of-type{border-bottom:none}
+.tname{font-size:11.5px;color:var(--soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tbar{height:6px;background:var(--meterbg);border:1px solid var(--line);position:relative;overflow:hidden}
+.tbar .fill{height:100%;transition:width .6s,background .4s}
+.tval{font-size:15px;font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+.tval.ok{color:var(--green)} .tval.warn{color:var(--warn)} .tval.danger{color:var(--danger)}
+.tpeak{font-size:9.5px;color:var(--dim2);text-align:right}
+.tempty{padding:16px 0 8px;font-size:11px;color:var(--dim);line-height:1.9}
+/* 温度/磁盘列表区: 撑满卡片剩余高度, 条目多时内部滚动 */
+#tempList,#diskList{flex:1 1 auto;min-height:0;overflow-y:auto;scrollbar-width:thin}
+.sources{margin-top:11px;padding-top:10px;border-top:1px dashed var(--line);
+	font-size:10px;color:var(--dim2);line-height:1.9;letter-spacing:.03em}
+.sources em{font-style:normal;color:var(--dim)}
+.src-on{color:var(--green)} .src-off{color:var(--dim2)}
+
+/* ---------- 磁盘 ---------- */
+.drow{display:grid;grid-template-columns:40px 1fr 70px;gap:11px;align-items:center;padding:9px 0;border-bottom:1px dashed var(--dash)}
+.drow:last-child{border-bottom:none}
+.dletter{width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+	border:1px solid var(--line2);border-radius:3px;font-weight:600;font-size:15px;color:var(--cyan);
+	background:rgba(67,198,222,.05)}
+.dletter.danger{color:var(--danger);border-color:rgba(255,77,94,.5);background:rgba(255,77,94,.06)}
+.dletter.warn{color:var(--warn);border-color:rgba(255,159,46,.45);background:rgba(255,159,46,.05)}
+.dtop{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;gap:8px}
+.dlabel{font-size:11px;color:var(--soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dfree{font-size:10.5px;color:var(--dim);white-space:nowrap;font-variant-numeric:tabular-nums}
+.dfree.warn{color:var(--warn)} .dfree.danger{color:var(--danger)}
+.dpct{text-align:right;font-variant-numeric:tabular-nums}
+.dpct b{font-size:14.5px;font-weight:600}
+.dpct b.warn{color:var(--warn)} .dpct b.danger{color:var(--danger)}
+.dpct span{display:block;font-size:9px;color:var(--dim2);letter-spacing:.15em;margin-top:2px}
+.drow .meter{height:10px}
+
+/* ---------- 页脚 ---------- */
+footer{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:17px;padding-top:12px;
+	border-top:1px solid var(--line);font-size:10px;color:var(--dim2);letter-spacing:.06em}
+footer b{color:var(--dim);font-weight:500}
+
+/* ---------- Toast ---------- */
+.toast{position:fixed;right:20px;bottom:20px;z-index:99;min-width:270px;max-width:360px;
+	background:var(--panel);border:1px solid var(--line2);border-left:3px solid var(--green);border-radius:4px;
+	padding:13px 16px;box-shadow:0 10px 34px var(--shadow2);
+	opacity:0;transform:translateY(10px);pointer-events:none;transition:.35s cubic-bezier(.22,1,.36,1)}
+.toast.show{opacity:1;transform:none}
+.toast.warn{border-left-color:var(--warn)} .toast.danger{border-left-color:var(--danger)}
+.toast b{display:block;font-family:var(--disp);font-size:12.5px;letter-spacing:.06em;margin-bottom:3px}
+.toast.ok b{color:var(--green)} .toast.warn b{color:var(--warn)} .toast.danger b{color:var(--danger)}
+.toast span{font-size:11px;color:var(--dim)}
+
+@media (max-width:920px){.grid{grid-template-columns:1fr}.readout b{font-size:40px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+	<header class="boot">
+		<div class="brand">
+			<span class="led off" id="srvLed"></span>
+			<div>
+				<h1>MEM·REDUCT<em>系统监控台</em></h1>
+				<div class="sub">SYSTEM CONSOLE · LOCAL TELEMETRY · 本机实时遥测</div>
+			</div>
+		</div>
+		<div class="ctrl">
+			<label class="selwrap">刷新
+				<select id="interval">
+					<option value="0" selected>手动</option>
+					<option value="2000">2s</option>
+					<option value="5000">5s</option>
+					<option value="15000">15s</option>
+				</select>
+			</label>
+			<button class="btn" id="btnRefresh" title="立即获取一轮最新数据"><span class="ic">↻</span>刷新</button>
+			<button class="btn" id="btnTheme" title="切换配色主题：暗色 → 明色 → 彩色">◐ 主题</button>
+			<button class="btn primary" id="btnClean"><span>▮ 清理内存</span></button>
+		</div>
+	</header>
+
+	<div class="rule boot"></div>
+
+	<div class="banner ok boot" id="banner">
+		<span class="bicon" id="bIcon">◉</span>
+		<div><b id="bTitle">正在初始化遥测…</b> <span id="bMsg">连接本机监控服务</span></div>
+	</div>
+
+	<main class="grid">
+			<!-- CPU -->
+			<div class="card boot" style="animation-delay:.14s;--acc:var(--cyan)">
+				<div class="chead">
+					<span class="tag" style="color:var(--cyan)">CPU</span>
+					<span class="tag-sub">处理器占用 / LOAD</span>
+					<span class="led off" id="cpuLed"></span>
+				</div>
+				<div class="readout">
+					<b id="cpuVal">--</b><i>%</i>
+					<span class="side" id="cpuName">…</span>
+				</div>
+				<div class="meter"><div class="fill cy" id="cpuFill"></div></div>
+				<canvas class="spark" id="sparkCpu"></canvas>
+				<div class="meta"><span>本次会话峰值 <b id="cpuPeak">--%</b></span><span>历史趋势</span></div>
+			</div>
+
+			<!-- 内存 -->
+			<div class="card boot" style="animation-delay:.18s;--acc:var(--amber)">
+				<div class="chead">
+					<span class="tag" style="color:var(--amber)">MEM</span>
+					<span class="tag-sub">内存占用 / PHYSICAL</span>
+					<span class="led off" id="memLed"></span>
+				</div>
+				<div class="readout">
+					<b id="memVal">--</b><i>%</i>
+					<span class="side" id="memGB">-- GB / -- GB</span>
+				</div>
+				<div class="meter"><div class="fill am" id="memFill"></div></div>
+				<canvas class="spark" id="sparkMem"></canvas>
+				<div class="meta">
+					<span>本次会话峰值 <b id="memPeak">--%</b></span>
+					<span><button id="btnClean2" style="all:unset;cursor:pointer;color:var(--amber);border-bottom:1px dashed var(--amber);font-size:10.5px">手动清理内存 ↗</button></span>
+				</div>
+				<div class="note">自动清理计划 <b>MemReduct-DailyClean · 每日 23:00</b> 已由 Windows 计划任务托管，与本页无关</div>
+			</div>
+
+			<!-- 温度 -->
+			<div class="card boot" style="animation-delay:.22s;--acc:var(--green)">
+				<div class="chead">
+					<span class="tag" style="color:var(--green)">TEMP</span>
+					<span class="tag-sub">温度传感器 / THERMAL</span>
+					<span class="led off" id="tempLed"></span>
+				</div>
+				<div id="tempList"><div class="tempty">正在读取传感器…<br>主板 / CPU / GPU / 硬盘温度将按可用数据源显示</div></div>
+				<div class="sources" id="sources">数据源探测中…</div>
+			</div>
+
+			<!-- 磁盘 -->
+			<div class="card boot" style="animation-delay:.26s;--acc:var(--warn)">
+				<div class="chead">
+					<span class="tag" style="color:var(--warn)">DISK</span>
+					<span class="tag-sub">磁盘剩余空间 / VOLUMES</span>
+					<span class="led off" id="diskLed"></span>
+				</div>
+				<div id="diskList"><div class="tempty">正在读取磁盘信息…</div></div>
+			</div>
+	</main>
+
+	<footer>
+		<span>最后更新 <b id="ts">—</b> · 模式 <b id="tsIv">手动</b></span>
+		<span>手动模式：打开页面/切回标签页时自动取一次 · 点「刷新」随时更新 · 查询经服务端缓存聚合</span>
+	</footer>
+</div>
+
+<div class="toast" id="toast"><b id="tTitle"></b><span id="tMsg"></span></div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const CLS = ['ok','warn','danger'];
+const THR = { cpu:[60,85], mem:[60,85],
+	temp:{ cpu:[60,80], gpu:[65,80], board:[50,65], drive:[45,55], other:[50,65] } };
+const lvl = (v,t) => v>=t[1]?2 : v>=t[0]?1 : 0;
+/* 温度影响说明 (hover tips) */
+const TIP = {
+	cpu:'处理器内部温度。轻负载 40~60°C 正常；长期高于 85°C 触发降频保护（性能明显下降），高于 95°C 属过热，需检查散热器积灰与风扇转速。',
+	gpu:'显卡核心温度。日常 40~60°C、高负载 65~85°C 正常；高于 85°C 自动降频（帧数下降），长期如此缩短风扇与显存寿命。',
+	board:'主板贴片传感器，读数通常仅比室温高 5~15°C。高于 65°C 说明机箱积热，会影响供电稳定与硬盘寿命，建议改善风道。',
+	drive:'硬盘温度。SSD 高于 60°C 会降速、极端时掉盘（有数据风险）；机械硬盘高于 55°C 加速老化。注意安装间距与机箱风道。',
+	other:'其他传感器温度。持续高于 65°C 需关注散热。'
+};
+const cssVar = n => getComputedStyle(document.body).getPropertyValue(n).trim();
+
+const hist = { cpu:[], mem:[] };
+const peak = { cpu:0, mem:0, temp:{} };   // temp: id -> 会话峰值
+const state = { stats:null, temp:null, drive:null, offline:false };
+let curIv = 0, timers = {}, failN = 0;
+
+const fmt = (n,d=1) => Number(n).toFixed(d);
+const ftime = ts => new Date(ts).toLocaleTimeString('zh-CN',{hour12:false});
+
+/* ---------- Sparkline ---------- */
+function drawSpark(cv, data, color){
+	const dpr = window.devicePixelRatio||1;
+	const w = cv.clientWidth, h = cv.clientHeight;
+	if (!w) return;
+	if (cv.width !== Math.round(w*dpr)){ cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr); }
+	const g = cv.getContext('2d');
+	g.setTransform(dpr,0,0,dpr,0,0);
+	g.clearRect(0,0,w,h);
+	g.strokeStyle = 'rgba(255,255,255,.055)'; g.lineWidth = 1;
+	for (let i=1;i<4;i++){ const y=(h/4)*i; g.beginPath(); g.moveTo(0,y); g.lineTo(w,y); g.stroke(); }
+	if (data.length < 2){ g.fillStyle='rgba(113,130,143,.75)'; g.font='10px Consolas,monospace'; g.fillText('采集中 …',3,14); return; }
+	const SLOTS=60, step=w/(SLOTS-1), x0=w-(data.length-1)*step;
+	const grad=g.createLinearGradient(0,0,0,h);
+	grad.addColorStop(0,color+'26'); grad.addColorStop(1,color+'00');
+	g.beginPath();
+	data.forEach((v,i)=>{ const x=x0+i*step, y=h-2-(Math.min(v,100)/100)*(h-6); i?g.lineTo(x,y):g.moveTo(x,y); });
+	g.strokeStyle=color; g.lineWidth=1.6; g.lineJoin='round'; g.stroke();
+	g.lineTo(x0+(data.length-1)*step,h); g.lineTo(x0,h); g.closePath();
+	g.fillStyle=grad; g.fill();
+	const lx=x0+(data.length-1)*step, ly=h-2-(Math.min(data[data.length-1],100)/100)*(h-6);
+	g.beginPath(); g.arc(lx,ly,2.4,0,7); g.fillStyle=color; g.shadowColor=color; g.shadowBlur=7; g.fill(); g.shadowBlur=0;
+}
+
+/* ---------- 渲染 ---------- */
+function setLed(el,cls){ el.className = 'led ' + cls; }
+function renderStats(d){
+	state.stats=d;
+	$('#cpuVal').textContent = d.cpu;
+	$('#memVal').textContent = fmt(d.memPct);
+	$('#memGB').textContent = fmt(d.memUsedGB)+' GB / '+fmt(d.memTotalGB)+' GB';
+	if (d.cpuName) $('#cpuName').textContent = d.cpuName;
+	const lc = CLS[lvl(d.cpu,THR.cpu)], lm = CLS[lvl(d.memPct,THR.mem)];
+	$('#cpuVal').className = lc; $('#memVal').className = lm;
+	setLed($('#cpuLed'),lc); setLed($('#memLed'),lm);
+	const cf=$('#cpuFill'); cf.style.width=d.cpu+'%'; cf.className='fill '+(lc==='ok'?'cy':lc);
+	const mf=$('#memFill'); mf.style.width=fmt(d.memPct)+'%'; mf.className='fill '+(lm==='ok'?'am':lm);
+	hist.cpu.push(d.cpu); hist.mem.push(d.memPct);
+	if (hist.cpu.length>60) hist.cpu.shift(); if (hist.mem.length>60) hist.mem.shift();
+	if (d.cpu>peak.cpu) peak.cpu=d.cpu;
+	if (d.memPct>peak.mem) peak.mem=d.memPct;
+	$('#cpuPeak').textContent = peak.cpu+'%'; $('#memPeak').textContent = fmt(peak.mem)+'%';
+	drawSpark($('#sparkCpu'), hist.cpu, cssVar('--cyan')||'#43c6de');
+	drawSpark($('#sparkMem'), hist.mem, cssVar('--amber')||'#ffb000');
+}
+function renderTemp(d){
+	state.temp=d;
+	const box=$('#tempList');
+	if (!d.sensors.length){
+		box.innerHTML='<div class="tempty">暂无可用温度传感器<br>ACPI 热区 / 硬件监控驱动均未返回数据</div>';
+	} else {
+		box.innerHTML = d.sensors.map(s=>{
+			const th=THR.temp[s.kind]||THR.temp.other, l=CLS[lvl(s.c,th)];
+			if (!(s.id in peak.temp) || s.c>peak.temp[s.id]) peak.temp[s.id]=s.c;
+			const pk=peak.temp[s.id];
+			const st=l===2?'过热':(l===1?'偏高':'正常');
+			const tip=TIP[s.kind]||TIP.other;
+			return '<div class="trow" title="'+s.name+'：'+st+'（'+fmt(s.c)+'°C）&#10;&#10;'+tip+'">'+
+				'<div class="tname">'+s.name+'</div>'+
+				'<div class="tbar"><div class="fill '+l+'" style="width:'+Math.min(s.c,100)+'%"></div></div>'+
+				'<div class="tval '+l+'">'+fmt(s.c)+'°C</div>'+
+				'<div class="tpeak">峰'+fmt(pk,0)+'°</div></div>';
+		}).join('');
+	}
+	const s=d.sources||{};
+	const item=(on,ok,off)=>'<span class="'+(on?'src-on':'src-off')+'">'+(on?'✓ ':'✗ ')+ok+'</span>'+(off?'<span class="src-off">'+off+'</span>':'');
+	$('#sources').innerHTML='<em>数据源</em>　'+item(s.acpi,'ACPI主板热区')+'　'+item(s.gpu,'GPU·nvidia-smi')+'　'+
+		item(s.lhmfile,'CPU/硬盘·LHM提权'+(s.lhmfile?'':' (writer未运行或数据过期)'))+'　'+
+		item(s.lhm,'LHM·WMI')+'　'+item(s.smart,'硬盘SMART'+(s.smart?'':' (需管理员)'));
+	const worst=d.sensors.reduce((m,s)=>Math.max(m, lvl(s.c, THR.temp[s.kind]||THR.temp.other)),0);
+	setLed($('#tempLed'), d.sensors.length?CLS[worst]:'off');
+}
+function renderDrive(d){
+	state.drive=d;
+	const box=$('#diskList');
+	if (!d.drives.length){ box.innerHTML='<div class="tempty">未检测到本地磁盘</div>'; setLed($('#diskLed'),'off'); return; }
+	let worst=0;
+	box.innerHTML = d.drives.map(v=>{
+		const freePct=100-v.usedPct;
+		let l=0;
+		if (freePct<10 || v.freeGB<10) l=2; else if (freePct<20 || v.freeGB<20) l=1;
+		worst=Math.max(worst,l);
+		return '<div class="drow">'+
+			'<div class="dletter '+CLS[l]+'">'+v.letter.replace(':','')+'</div>'+
+			'<div><div class="dtop"><span class="dlabel">'+(v.label||'本地磁盘')+'</span>'+
+			'<span class="dfree '+CLS[l]+'">剩余 '+fmt(v.freeGB)+' / '+fmt(v.totalGB)+' GB</span></div>'+
+			'<div class="meter"><div class="fill '+CLS[l]+'" style="width:'+v.usedPct+'%"></div></div></div>'+
+			'<div class="dpct"><b class="'+CLS[l]+'">'+fmt(v.usedPct)+'%</b><span>已用</span></div></div>';
+	}).join('');
+	setLed($('#diskLed'), CLS[worst]);
+}
+
+/* ---------- 总横幅 ---------- */
+function renderBanner(){
+	const b=$('#banner');
+	if (state.offline){
+		b.className='banner danger boot';
+		$('#bIcon').textContent='✕';
+		$('#bTitle').textContent='无法连接监控服务';
+		$('#bMsg').textContent='请在 webui 目录运行: powershell -NoProfile -ExecutionPolicy Bypass -File server.ps1';
+		setLed($('#srvLed'),'danger'); return;
+	}
+	const rs=[];
+	if (state.stats){
+		const lc=lvl(state.stats.cpu,THR.cpu);
+		if (lc===2) rs.push(['danger','CPU 占用 '+state.stats.cpu+'%']);
+		else if (lc===1) rs.push(['warn','CPU 占用 '+state.stats.cpu+'%']);
+		const lm=lvl(state.stats.memPct,THR.mem);
+		if (lm===2) rs.push(['danger','内存占用 '+fmt(state.stats.memPct)+'%']);
+		else if (lm===1) rs.push(['warn','内存占用 '+fmt(state.stats.memPct)+'%']);
+	}
+	if (state.temp) for (const s of state.temp.sensors){
+		const l=lvl(s.c, THR.temp[s.kind]||THR.temp.other);
+		if (l===2) rs.push(['danger', s.name+' '+fmt(s.c)+'°C 过热']);
+		else if (l===1) rs.push(['warn', s.name+' '+fmt(s.c)+'°C 偏高']);
+	}
+	if (state.drive) for (const v of state.drive.drives){
+		const freePct=100-v.usedPct;
+		if (freePct<10 || v.freeGB<10) rs.push(['danger','磁盘 '+v.letter+' 仅剩 '+fmt(v.freeGB)+' GB']);
+		else if (freePct<20 || v.freeGB<20) rs.push(['warn','磁盘 '+v.letter+' 剩余 '+fmt(v.freeGB)+' GB']);
+	}
+	const has = rs.some(r=>r[0]==='danger') ? 'danger' : (rs.length?'warn':'ok');
+	b.className='banner '+has+' boot';
+	setLed($('#srvLed'), has==='ok'?'ok':has);
+	if (!rs.length){
+		$('#bIcon').textContent='◉';
+		$('#bTitle').textContent='系统状态正常';
+		$('#bMsg').textContent='所有遥测指标处于安全范围';
+	} else {
+		$('#bIcon').textContent = has==='danger'?'✕':'▲';
+		$('#bTitle').textContent = has==='danger'?'检测到异常指标':'指标偏高';
+		$('#bMsg').textContent = rs.map(r=>r[1]).join(' · ');
+	}
+}
+
+/* ---------- 轮询 ---------- */
+async function fetchJSON(url,opt){
+	const r = await fetch(url, Object.assign({cache:'no-store'},opt));
+	if (!r.ok) throw new Error('HTTP '+r.status);
+	return r.json();
+}
+async function poll(kind){
+	try{
+		let d;
+		if (kind==='stats') { d=await fetchJSON('/api/stats'); renderStats(d); }
+		else if (kind==='temp') { d=await fetchJSON('/api/temp'); renderTemp(d); }
+		else { d=await fetchJSON('/api/drive'); renderDrive(d); }
+		failN=0; state.offline=false;
+		$('#ts').textContent=ftime(Date.now());
+	}catch(e){
+		if (++failN>=2){ state.offline=true; }
+	} finally { renderBanner(); }
+}
+function clearTimers(){ ['stats','temp','drive'].forEach(k=>{ clearTimeout(timers[k]); timers[k]=null; }); }
+function sched(kind,ms){ timers[kind]=setTimeout(async()=>{ await poll(kind); sched(kind,ms); },ms); }
+async function startPolling(){
+	clearTimers();
+	const btn=$('#btnRefresh');
+	btn.classList.add('busy'); // 按钮进入 loading: 图标旋转, 三路数据到齐后恢复
+	const jobs=[poll('stats'),poll('temp'),poll('drive')]; // 先取一轮（手动模式也取）
+	if (!curIv) $('#tsIv').textContent='手动';
+	else {
+		$('#tsIv').textContent=(curIv/1000)+'s';
+		sched('stats',curIv);
+		sched('temp', Math.max(curIv*6,30000));
+		sched('drive',Math.max(curIv*24,120000));
+	}
+	await Promise.allSettled(jobs);
+	btn.classList.remove('busy');
+}
+document.addEventListener('visibilitychange',()=>{ document.hidden ? clearTimers() : startPolling(); });
+
+/* ---------- Toast ---------- */
+let toastTimer;
+function toast(title,msg,cls='ok'){
+	const t=$('#toast');
+	$('#tTitle').textContent=title; $('#tMsg').textContent=msg||'';
+	t.className='toast show '+cls;
+	clearTimeout(toastTimer);
+	toastTimer=setTimeout(()=>t.className='toast '+cls,6500);
+}
+
+/* ---------- 清理内存 ---------- */
+async function doClean(){
+	const btn=$('#btnClean'), old=btn.innerHTML;
+	btn.disabled=true; btn.innerHTML='<span>等待授权或清理中 …</span>';
+	try{
+		const d=await fetchJSON('/api/clean',{method:'POST'});
+		if (!d.ok){ toast('清理失败',d.err||'memreduct.exe 执行异常','danger'); }
+		else if (d.freedGB>0.01){ toast('清理完成 · 释放 '+fmt(d.freedGB,2)+' GB','内存占用 '+fmt(d.beforeGB)+' GB → '+fmt(d.afterGB)+' GB'); }
+		else { toast('清理完成','当前无可释放内存 ('+fmt(d.beforeGB)+' GB → '+fmt(d.afterGB)+' GB)','warn'); }
+		await poll('stats');
+	}catch(e){ toast('清理请求失败',e.message+' — 请确认监控服务在运行','danger'); }
+	finally{ btn.disabled=false; btn.innerHTML=old; }
+}
+$('#btnClean').addEventListener('click',doClean);
+$('#btnClean2').addEventListener('click',doClean);
+
+/* ---------- 手动刷新 & 采样间隔 ---------- */
+$('#btnRefresh').addEventListener('click',()=>startPolling());
+$('#interval').addEventListener('change',e=>{
+	curIv=+e.target.value;
+	if (curIv){ startPolling(); toast('自动采样已开启','间隔 '+(curIv/1000)+' 秒，标签页隐藏时自动暂停'); }
+	else { clearTimers(); $('#tsIv').textContent='手动'; toast('已切换为手动刷新','点「刷新」按钮即可获取最新数据'); }
+});
+
+/* ---------- 主题切换 (明/暗/彩) ---------- */
+const THEMES=['dark','light','color'], TNAME={dark:'暗色',light:'明色',color:'彩色'};
+function applyTheme(t,persist){
+	document.body.dataset.theme=t;
+	if (persist!==false){ try{ localStorage.setItem('mr-theme',t); }catch(e){} }
+	document.querySelector('meta[name="color-scheme"]').setAttribute('content',t==='light'?'light':'dark');
+}
+(function(){ // 启动恢复上次主题 (URL ?theme=light|color|dark 可强制指定且不写入记忆)
+	let t=null, fromUrl=false;
+	try{ t=new URLSearchParams(location.search).get('theme'); }catch(e){}
+	if (THEMES.indexOf(t)>=0) fromUrl=true;
+	else { try{ t=localStorage.getItem('mr-theme'); }catch(e){} }
+	if (THEMES.indexOf(t)<0) t='dark';
+	applyTheme(t,!fromUrl);
+})();
+$('#btnTheme').addEventListener('click',()=>{
+	const cur=THEMES.indexOf(document.body.dataset.theme||'dark');
+	const nt=THEMES[(cur+1)%THEMES.length];
+	applyTheme(nt);
+	if (hist.cpu.length>1) drawSpark($('#sparkCpu'),hist.cpu,cssVar('--cyan')||'#43c6de');
+	if (hist.mem.length>1) drawSpark($('#sparkMem'),hist.mem,cssVar('--amber')||'#ffb000');
+	toast('主题已切换 · '+TNAME[nt],'下次打开将保持此主题');
+});
+
+/* ---------- 启动 ---------- */
+if (location.protocol==='file:'){
+	$('#banner').className='banner danger boot';
+	$('#bIcon').textContent='✕';
+	$('#bTitle').textContent='请通过本机服务访问';
+	$('#bMsg').textContent='先运行 webui/server.ps1, 然后浏览器打开 http://127.0.0.1:8765/';
+} else {
+	startPolling();
+}
+</script>
+</body>
+</html>

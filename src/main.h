@@ -23,14 +23,17 @@
 #define _r_config_getfont(key, logfont, dpi, section) _r_config_getfont_ex ((key), (logfont), (dpi), (section))
 #define _r_config_setfont(key, logfont, dpi, section) _r_config_setfont_ex ((key), (logfont), (dpi), (section))
 
-DEFINE_GUID (GUID_TrayIcon, 0xAE9053F0, 0x8D59, 0x4803, 0x9A, 0xBB, 0x74, 0xAF, 0xE6, 0x6B, 0x5F, 0xD2);
-
 LPWSTR _app_get_region_title (
 	_In_ ULONG mask_bit
 );
 
 #define TIMER 1000
 #define UID 1337
+#define RM_APP_TRAYFAILED (WM_APP + 100)
+
+BOOLEAN _app_tray_register (_In_ HWND hwnd);
+VOID _app_tray_destroy (_In_ HWND hwnd);
+VOID _app_tray_popup (_In_ HWND hwnd, _In_ ULONG flags, _In_opt_ LPCWSTR title, _In_opt_ LPCWSTR text);
 
 #define LANG_SUBMENU 1
 #define LANG_MENU 4

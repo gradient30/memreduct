@@ -29,6 +29,24 @@ Mem Reduct 是一款轻量级的实时内存管理工具，用于监控并清理
 便携模式：在程序目录创建 memreduct.ini，或从 "%APPDATA%\Henry++\Mem Reduct" 复制到程序目录。
 ```
 
+### 独立清理脚本（供其它项目接入）
+
+清理能力已抽取为零依赖 PowerShell 脚本 [scripts/mem-clean.ps1](scripts/mem-clean.ps1)，与 `memreduct.exe --clean` 同源（相同的 `NtSetSystemInformation` 机制），可被 Web 后端 / CI / 任意语言直接调用，并提供计划任务桥使**非提权 Web 服务也能真实触发清理**：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\mem-clean.ps1 -All -Json
+```
+
+接入方式、参数、退出码、各语言示例见 **[docs/MEM_CLEAN_SCRIPT.md](docs/MEM_CLEAN_SCRIPT.md)**；**其它项目 web 页面接入清理按钮**（CORS/跨源/后端代理/计划任务桥三种方式）见 **[docs/WEB_BUTTON_INTEGRATION.md](docs/WEB_BUTTON_INTEGRATION.md)**。
+
+### Web 监控台（webui/）
+
+`webui/server.ps1` 提供本机/Tailnet 网页监控（CPU · 内存 · 温度 · 磁盘）与一键清理。普通权限运行时，本机页面在没有计划任务桥的情况下会请求 Windows 管理员授权；已有计划任务桥时可直接清理。启动：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File webui\server.ps1
+```
+
 ### 系统要求
 
 - Windows 10 / 11（64 位或 ARM64）

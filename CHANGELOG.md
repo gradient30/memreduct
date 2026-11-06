@@ -4,6 +4,13 @@
 
 ---
 
+## v3.5.4 (6 November 2026)
+- hide the Help menu on the main window
+- fixed notification icon registration for installed and portable copies
+- allow local web cleanup to request administrator approval when the task bridge is unavailable
+
+---
+
 ## v3.5.3（gradient30 · 2026-06-22）
 
 本 fork 在 upstream v3.5.3 基础上的额外变更：

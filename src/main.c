@@ -1,6 +1,11 @@
 // Mem Reduct
 // Copyright (c) 2011-2026 Henry++
 
+#include <string.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <strsafe.h>
+
 #include "routine.h"
 
 #include "main.h"
@@ -355,6 +360,195 @@ VOID _app_drawbackground (
 	SetBkColor (hdc, prev_clr);
 }
 
+// total cpu usage via GetSystemTimes deltas (busy = kernel+user-idle; kernel includes idle)
+DOUBLE _app_getcpuusage (VOID)
+{
+	static ULONGLONG prev_busy = 0;
+	static ULONGLONG prev_total = 0;
+
+	FILETIME idle_time;
+	FILETIME kernel_time;
+	FILETIME user_time;
+	ULONGLONG idle;
+	ULONGLONG busy;
+	ULONGLONG total;
+	ULONGLONG total_delta;
+	ULONGLONG busy_delta;
+	DOUBLE result;
+
+	if (!GetSystemTimes (&idle_time, &kernel_time, &user_time))
+		return 0.0;
+
+	idle = ((ULONGLONG)idle_time.dwHighDateTime << 32) | idle_time.dwLowDateTime;
+	total = ((ULONGLONG)kernel_time.dwHighDateTime << 32) | kernel_time.dwLowDateTime;
+	total += ((ULONGLONG)user_time.dwHighDateTime << 32) | user_time.dwLowDateTime;
+	busy = total - idle;
+
+	if (prev_total && (total > prev_total))
+	{
+		total_delta = total - prev_total;
+
+		if (busy > prev_busy)
+			busy_delta = busy - prev_busy;
+		else
+			busy_delta = 0;
+
+		result = ((DOUBLE)busy_delta / (DOUBLE)total_delta) * 100.0;
+
+		if (result < 0.0)
+			result = 0.0;
+
+		if (result > 100.0)
+			result = 100.0;
+	}
+	else
+	{
+		result = 0.0;
+	}
+
+	prev_busy = busy;
+	prev_total = total;
+
+	return result;
+}
+
+// cpu package temperature from "%TEMP%\lhm_temps.txt" (written by lhm_writer every ~10s).
+// format: "T|CPU Package|58.0" / "T|Core Max|58.0". returns 0.0 when unavailable (file missing/stale).
+#define APP_LHMFILE_MAX_AGE (60) // seconds
+#define APP_LHMFILE_REREAD_MS (4000)
+
+DOUBLE _app_getcputemp (VOID)
+{
+	static ULONGLONG last_read_tick = 0;
+	static DOUBLE last_value = 0.0;
+
+	WCHAR path[MAX_PATH];
+	CHAR buffer[8192];
+	WIN32_FILE_ATTRIBUTE_DATA attributes;
+	FILETIME filetime_now;
+	ULONGLONG filetime_ull;
+	ULONGLONG now_ull;
+	ULONGLONG age_seconds;
+	ULONGLONG current_tick;
+	HANDLE hfile;
+	DWORD bytes_read = 0;
+	CHAR* p;
+	CHAR* p_end;
+	CHAR* line_end;
+	CHAR* value_part;
+	DOUBLE value;
+	DOUBLE temp_package = 0.0;
+	DOUBLE temp_coremax = 0.0;
+	BOOLEAN found_package = FALSE;
+	BOOLEAN found_coremax = FALSE;
+
+	// throttle file reads; lhm_writer refreshes every ~10s
+	current_tick = GetTickCount64 ();
+
+	if (last_read_tick && (current_tick >= last_read_tick) && ((current_tick - last_read_tick) < APP_LHMFILE_REREAD_MS))
+		return last_value;
+
+	last_read_tick = current_tick;
+
+	if (!GetTempPathW (RTL_NUMBER_OF (path), path))
+		return last_value;
+
+	if (FAILED (StringCchCatW (path, RTL_NUMBER_OF (path), L"lhm_temps.txt")))
+		return last_value;
+
+	if (!GetFileAttributesExW (path, GetFileExInfoStandard, &attributes))
+	{
+		last_value = 0.0;
+		return 0.0; // writer not installed/running
+	}
+
+	filetime_ull = ((ULONGLONG)attributes.ftLastWriteTime.dwHighDateTime << 32) | attributes.ftLastWriteTime.dwLowDateTime;
+	GetSystemTimeAsFileTime (&filetime_now);
+	now_ull = ((ULONGLONG)filetime_now.dwHighDateTime << 32) | filetime_now.dwLowDateTime;
+
+	age_seconds = (now_ull > filetime_ull) ? ((now_ull - filetime_ull) / 10000000ULL) : 0;
+
+	if (age_seconds > APP_LHMFILE_MAX_AGE)
+	{
+		last_value = 0.0;
+		return 0.0; // stale data
+	}
+
+	hfile = CreateFileW (path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+
+	if (hfile == INVALID_HANDLE_VALUE)
+	{
+		last_value = 0.0;
+		return 0.0;
+	}
+
+	if (!ReadFile (hfile, buffer, sizeof (buffer) - sizeof (CHAR), &bytes_read, NULL))
+		bytes_read = 0;
+
+	CloseHandle (hfile);
+
+	if (!bytes_read)
+	{
+		last_value = 0.0;
+		return 0.0;
+	}
+
+	buffer[bytes_read] = ANSI_NULL;
+
+	p = buffer;
+	p_end = buffer + bytes_read;
+
+	while (p < p_end)
+	{
+		line_end = strchr (p, '\n');
+
+		if (line_end)
+			*line_end = ANSI_NULL; // cut CR/LF
+		else
+			line_end = p_end;
+
+		if (((SIZE_T)(line_end - p) > 4) && (p[0] == 'T') && (p[1] == '|'))
+		{
+			value_part = strchr (p + 2, '|');
+
+			if (value_part && (value_part < line_end))
+			{
+				*value_part = ANSI_NULL;
+
+				value = strtod (value_part + 1, NULL);
+
+				if (!_stricmp (p + 2, "CPU Package"))
+				{
+					temp_package = value;
+					found_package = TRUE;
+				}
+				else if (!_stricmp (p + 2, "Core Max"))
+				{
+					temp_coremax = value;
+					found_coremax = TRUE;
+				}
+			}
+		}
+
+		p = line_end + 1;
+	}
+
+	if (found_package && (temp_package > 0.0) && (temp_package < 120.0))
+	{
+		last_value = temp_package;
+	}
+	else if (found_coremax && (temp_coremax > 0.0) && (temp_coremax < 120.0))
+	{
+		last_value = temp_coremax;
+	}
+	else
+	{
+		last_value = 0.0;
+	}
+
+	return last_value;
+}
+
 VOID _app_iconinit (
 	_In_ LONG dpi_value
 );
@@ -489,6 +683,116 @@ HICON _app_iconcreate (
 	return hicon;
 }
 
+// GUID notification icons are bound to the first executable path that uses
+// them. A window and ID also work after installing or moving the application.
+static VOID _app_tray_initialize (
+	_Out_ NOTIFYICONDATAW* data,
+	_In_ HWND hwnd
+)
+{
+	RtlSecureZeroMemory (data, sizeof (*data));
+	data->cbSize = sizeof (*data);
+	data->hWnd = hwnd;
+	data->uID = UID;
+}
+
+static BOOLEAN _app_tray_add (
+	_In_ HWND hwnd,
+	_In_opt_ HICON hicon,
+	_In_opt_ LPCWSTR tooltip
+)
+{
+	NOTIFYICONDATAW data;
+
+	_app_tray_initialize (&data, hwnd);
+	data.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_SHOWTIP;
+	data.uCallbackMessage = RM_TRAYICON;
+	data.hIcon = hicon ? hicon : LoadIconW (NULL, IDI_APPLICATION);
+
+	if (tooltip)
+		StringCchCopyW (data.szTip, RTL_NUMBER_OF (data.szTip), tooltip);
+
+	// Avoid deleting an existing icon each time the window is hidden.
+	if (Shell_NotifyIconW (NIM_MODIFY, &data))
+		return TRUE;
+
+	if (!Shell_NotifyIconW (NIM_ADD, &data))
+		return FALSE;
+
+	data.uVersion = NOTIFYICON_VERSION_4;
+	Shell_NotifyIconW (NIM_SETVERSION, &data);
+
+	return TRUE;
+}
+
+VOID _app_tray_destroy (
+	_In_ HWND hwnd
+)
+{
+	NOTIFYICONDATAW data;
+
+	_app_tray_initialize (&data, hwnd);
+	Shell_NotifyIconW (NIM_DELETE, &data);
+}
+
+VOID _app_tray_popup (
+	_In_ HWND hwnd,
+	_In_ ULONG flags,
+	_In_opt_ LPCWSTR title,
+	_In_opt_ LPCWSTR text
+)
+{
+	NOTIFYICONDATAW data;
+
+	_app_tray_initialize (&data, hwnd);
+	data.uFlags = NIF_INFO | NIF_REALTIME;
+	data.dwInfoFlags = flags;
+
+	if (title)
+		StringCchCopyW (data.szInfoTitle, RTL_NUMBER_OF (data.szInfoTitle), title);
+
+	if (text)
+		StringCchCopyW (data.szInfo, RTL_NUMBER_OF (data.szInfo), text);
+
+	if (!Shell_NotifyIconW (NIM_MODIFY, &data) && _app_tray_register (hwnd))
+		Shell_NotifyIconW (NIM_MODIFY, &data);
+}
+
+static VOID _app_tray_setinfoformat (
+	_In_ HWND hwnd,
+	_In_opt_ HICON hicon,
+	_In_ _Printf_format_string_ LPCWSTR format,
+	...
+)
+{
+	NOTIFYICONDATAW data;
+	PR_STRING string;
+	va_list args;
+
+	va_start (args, format);
+	string = _r_format_string_v (format, args);
+	va_end (args);
+
+	if (!string)
+		return;
+
+	_app_tray_initialize (&data, hwnd);
+	data.uFlags = NIF_TIP | NIF_SHOWTIP;
+	StringCchCopyW (data.szTip, RTL_NUMBER_OF (data.szTip), string->buffer);
+
+	if (hicon)
+	{
+		data.uFlags |= NIF_ICON;
+		data.hIcon = hicon;
+	}
+
+	// Recreate the complete icon, callback and version if Explorer lost it.
+	if (!Shell_NotifyIconW (NIM_MODIFY, &data))
+		_app_tray_add (hwnd, hicon ? hicon : _app_iconcreate (0), string->buffer);
+
+	_r_obj_dereference (string);
+}
+
 VOID CALLBACK _app_timercallback (
 	_In_ HWND hwnd,
 	_In_ UINT msg,
@@ -501,6 +805,8 @@ VOID CALLBACK _app_timercallback (
 	HICON hicon = NULL;
 	LONG64 timestamp;
 	ULONG percent;
+	DOUBLE cpu_usage;
+	DOUBLE cpu_temp;
 	BOOLEAN is_clean = FALSE;
 
 	if (id_event != UID)
@@ -537,18 +843,44 @@ VOID CALLBACK _app_timercallback (
 		hicon = _app_iconcreate (config.ms_prev);
 	}
 
-	_r_tray_setinfoformat (
-		hwnd,
-		&GUID_TrayIcon,
-		hicon,
-		L"%s: %" TEXT (PR_DOUBLE) L"%%\r\n%s: %" TEXT (PR_DOUBLE) L"%%\r\n%s: %" TEXT (PR_DOUBLE) L"%%",
-		_r_locale_getstring (IDS_GROUP_1),
-		mem_info.physical_memory.percent_f,
-		_r_locale_getstring (IDS_GROUP_2),
-		mem_info.page_file.percent_f,
-		_r_locale_getstring (IDS_GROUP_3),
-		mem_info.system_cache.percent_f
-	);
+	// build tray tooltip: memory groups + cpu usage + cpu temperature (if available)
+	cpu_usage = _app_getcpuusage ();
+	cpu_temp = _app_getcputemp ();
+
+	if (cpu_temp > 0.0)
+	{
+		_app_tray_setinfoformat (
+			hwnd,
+			hicon,
+			L"%s: %" TEXT (PR_DOUBLE) L"%%\r\n%s: %" TEXT (PR_DOUBLE) L"%%\r\n%s: %" TEXT (PR_DOUBLE) L"%%\r\n%s: %" TEXT (PR_DOUBLE) L"%%\r\n%s: %.1f\u00B0C",
+			_r_locale_getstring (IDS_GROUP_1),
+			mem_info.physical_memory.percent_f,
+			_r_locale_getstring (IDS_GROUP_2),
+			mem_info.page_file.percent_f,
+			_r_locale_getstring (IDS_GROUP_3),
+			mem_info.system_cache.percent_f,
+			_r_locale_getstring (IDS_GROUP_4),
+			cpu_usage,
+			_r_locale_getstring (IDS_GROUP_5),
+			cpu_temp
+		);
+	}
+	else
+	{
+		_app_tray_setinfoformat (
+			hwnd,
+			hicon,
+			L"%s: %" TEXT (PR_DOUBLE) L"%%\r\n%s: %" TEXT (PR_DOUBLE) L"%%\r\n%s: %" TEXT (PR_DOUBLE) L"%%\r\n%s: %" TEXT (PR_DOUBLE) L"%%",
+			_r_locale_getstring (IDS_GROUP_1),
+			mem_info.physical_memory.percent_f,
+			_r_locale_getstring (IDS_GROUP_2),
+			mem_info.page_file.percent_f,
+			_r_locale_getstring (IDS_GROUP_3),
+			mem_info.system_cache.percent_f,
+			_r_locale_getstring (IDS_GROUP_4),
+			cpu_usage
+		);
+	}
 
 	if (!_r_wnd_isvisible (hwnd, FALSE))
 		return;
@@ -616,7 +948,7 @@ VOID _app_iconredraw (
 		_app_timercallback (hwnd, 0, UID, 0);
 }
 
-VOID _app_tray_register (
+BOOLEAN _app_tray_register (
 	_In_ HWND hwnd
 )
 {
@@ -630,8 +962,7 @@ VOID _app_tray_register (
 
 	hicon = _app_iconcreate (0);
 
-	_r_tray_destroy (hwnd, &GUID_TrayIcon);
-	_r_tray_create (hwnd, &GUID_TrayIcon, RM_TRAYICON, hicon, _r_app_getname (), FALSE);
+	return _app_tray_add (hwnd, hicon, _r_app_getname ());
 }
 
 VOID _app_iconinit (
@@ -1744,7 +2075,7 @@ INT_PTR CALLBACK DlgProc (
 		{
 			KillTimer (hwnd, UID);
 
-			_r_tray_destroy (hwnd, &GUID_TrayIcon);
+			_app_tray_destroy (hwnd);
 
 			PostQuitMessage (0);
 
@@ -1776,7 +2107,8 @@ INT_PTR CALLBACK DlgProc (
 
 			_app_iconinit (dpi_value);
 
-			_app_tray_register (hwnd);
+			if (!_app_tray_register (hwnd))
+				PostMessageW (hwnd, RM_APP_TRAYFAILED, 0, 0);
 
 			break;
 		}
@@ -1797,7 +2129,8 @@ INT_PTR CALLBACK DlgProc (
 
 			_app_iconinit (dpi_value);
 
-			_app_tray_register (hwnd);
+			if (!_app_tray_register (hwnd))
+				PostMessageW (hwnd, RM_APP_TRAYFAILED, 0, 0);
 
 			break;
 		}
@@ -1814,7 +2147,6 @@ INT_PTR CALLBACK DlgProc (
 				_r_menu_setitemtext (hmenu, 0, TRUE, _r_locale_getstring (IDS_FILE));
 				_r_menu_setitemtext (hmenu, 1, TRUE, _r_locale_getstring (IDS_VIEW));
 				_r_menu_setitemtext (hmenu, 2, TRUE, _r_locale_getstring (IDS_SETTINGS));
-				_r_menu_setitemtext (hmenu, 3, TRUE, _r_locale_getstring (IDS_HELP));
 
 				_r_menu_setitemtextformat (hmenu, IDM_SETTINGS, FALSE, L"%s...\tF2", _r_locale_getstring (IDS_SETTINGS));
 				_r_menu_setitemtext (hmenu, IDM_EXIT, FALSE, _r_locale_getstring (IDS_EXIT));
@@ -1826,9 +2158,6 @@ INT_PTR CALLBACK DlgProc (
 				_r_menu_setitemtext (hmenu, IDM_SKIPUACWARNING_CHK, FALSE, _r_locale_getstring (IDS_SKIPUACWARNING_CHK));
 				_r_menu_setitemtext (hmenu, IDM_CHECKUPDATES_CHK, FALSE, _r_locale_getstring (IDS_CHECKUPDATES_CHK));
 				_r_menu_setitemtextformat (GetSubMenu (hmenu, LANG_SUBMENU), LANG_MENU, TRUE, _r_locale_getstring (IDS_LANGUAGE_MENU_FORMAT), _r_locale_getstring (IDS_LANGUAGE));
-				_r_menu_setitemtext (hmenu, IDM_WEBSITE, FALSE, _r_locale_getstring (IDS_WEBSITE));
-				_r_menu_setitemtext (hmenu, IDM_CHECKUPDATES, FALSE, _r_locale_getstring (IDS_CHECKUPDATES));
-				_r_menu_setitemtextformat (hmenu, IDM_ABOUT, FALSE, L"%s\tF1", _r_locale_getstring (IDS_ABOUT));
 			}
 
 			// configure listview
@@ -1902,8 +2231,17 @@ INT_PTR CALLBACK DlgProc (
 		{
 			if (wparam)
 				_app_iconredraw (hwnd);
-			else
-				_app_tray_register (hwnd);
+			else if (!_app_tray_register (hwnd))
+				PostMessageW (hwnd, RM_APP_TRAYFAILED, 0, 0);
+
+			break;
+		}
+
+		case RM_APP_TRAYFAILED:
+		{
+			// Keep the application reachable when Explorer is unavailable.
+			if (!IsWindowVisible (hwnd) && !_app_tray_register (hwnd))
+				ShowWindow (hwnd, SW_RESTORE);
 
 			break;
 		}
