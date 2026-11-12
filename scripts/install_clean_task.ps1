@@ -110,12 +110,13 @@ Write-Host "  结果文件:  $ResultFile"
 if ( $Daily )
 {
 	$time = $null
-	if ( -not [TimeSpan]::TryParse($Daily, [ref]$time) )
+	try { $time = [TimeSpan]::Parse($Daily) } catch { $time = $null }
+	if ( $null -eq $time )
 	{
 		Write-Host "错误: -Daily 时间格式不正确: $Daily (示例: 23:00)" -ForegroundColor Red
 		exit 4
 	}
-	$dailyTrigger = New-ScheduledTaskTrigger -Daily -At $time
+	$dailyTrigger = New-ScheduledTaskTrigger -Daily -At ((Get-Date).Date + $time)
 
 	# 旧版 MemReduct-DailyClean 为 exe --clean + RunLevel Limited, 提权检查不通过, 从未真正清理 — 重建
 	$old = Get-ScheduledTask -TaskName $TaskNameDaily -ErrorAction SilentlyContinue
