@@ -26,6 +26,12 @@ HANDOFF_SESSION.md
 HANDOFF_SESSION.txt
 docs/SESSION_HANDOFF.md
 
+# 本地 Git 同步/备份（勿提交）
+git-sync-to-tcloud.sh
+git_init_tcloud.sh
+last_sync_id
+*.bundle
+
 thumbs.db
 ehthumbs.db
 desktop.ini
