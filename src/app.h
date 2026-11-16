@@ -5,8 +5,8 @@
 
 #define APP_NAME L"内存清理"
 #define APP_NAME_SHORT L"memreduct"
-#define APP_VERSION L"3.5.4"
-#define APP_VERSION_RES 3,5,4,0
+#define APP_VERSION L"3.5.5"
+#define APP_VERSION_RES 3,5,5,0
 #define APP_AUTHOR L"Henry++"
 #define APP_COPYRIGHT L"(c) 2011-2026 " APP_AUTHOR L". All Rights Reversed."
 

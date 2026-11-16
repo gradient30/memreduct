@@ -2173,6 +2173,7 @@ INT_PTR CALLBACK DlgProc (
 
 			// configure button
 			_r_ctrl_setstring (hwnd, IDC_CLEAN, _r_locale_getstring (IDS_CLEAN));
+			_r_ctrl_setstring (hwnd, IDC_WEB_HOME, _r_locale_getstring (IDS_WEB_HOME));
 
 			// enum localizations
 			if (hmenu)
@@ -2431,8 +2432,7 @@ INT_PTR CALLBACK DlgProc (
 					_r_menu_setitemtext (hsubmenu, TRAY_SUBMENU_2, TRUE, _r_locale_getstring (IDS_TRAY_POPUP_2));
 					_r_menu_setitemtext (hsubmenu, TRAY_SUBMENU_3, TRUE, _r_locale_getstring (IDS_TRAY_POPUP_3));
 					_r_menu_setitemtextformat (hsubmenu, IDM_TRAY_SETTINGS, FALSE, L"%s...", _r_locale_getstring (IDS_SETTINGS));
-					_r_menu_setitemtext (hsubmenu, IDM_TRAY_WEBSITE, FALSE, _r_locale_getstring (IDS_WEBSITE));
-					_r_menu_setitemtext (hsubmenu, IDM_TRAY_ABOUT, FALSE, _r_locale_getstring (IDS_ABOUT));
+					_r_menu_setitemtext (hsubmenu, IDM_TRAY_WEB_HOME, FALSE, _r_locale_getstring (IDS_WEB_HOME));
 					_r_menu_setitemtext (hsubmenu, IDM_TRAY_EXIT, FALSE, _r_locale_getstring (IDS_EXIT));
 
 					// configure region submenu
@@ -2873,6 +2873,13 @@ INT_PTR CALLBACK DlgProc (
 						}
 					}
 
+					break;
+				}
+
+				case IDC_WEB_HOME:
+				case IDM_TRAY_WEB_HOME:
+				{
+					_r_shell_opendefault (L"http://127.0.0.1:8765/");
 					break;
 				}
 

@@ -1,3 +1,7 @@
+v3.5.5 (16 November 2026)
+- add a Web home shortcut to the main window and tray menu
+- remove the website and about entries from the tray menu
+
 v3.5.4 (6 November 2026)
 - hide the Help menu on the main window
 - fixed notification icon registration for installed and portable copies

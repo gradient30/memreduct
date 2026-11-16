@@ -7,7 +7,7 @@ call "%~dp0scripts\setup_build_paths.bat"
 
 set "BUILDER_DIR=%~dp0..\builder"
 set "OUT_DIR=%~dp0build"
-set "APP_VERSION=3.5.4"
+set "APP_VERSION=3.5.5"
 
 if not exist "%BUILDER_DIR%\build.bat" (
 	echo [ERROR] builder not found: %BUILDER_DIR%
